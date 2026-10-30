@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "haola-checkup": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://ai.ihaola.com.cn/api/mcp/haola-pe"
+      ]
+    }
+  }
+}

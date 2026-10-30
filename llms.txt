@@ -1,0 +1,24 @@
+# 好啦体检 MCP（Haola Checkup MCP）
+
+远程 MCP 服务，让 AI 直接出体检方案并完成预约。
+Remote MCP server for checkup planning and booking.
+
+- 端点 / Endpoint: https://ai.ihaola.com.cn/api/mcp/haola-pe
+- 传输 / Transport: Streamable HTTP
+- 工具 / Tools: 25 个（9 个匿名可用，16 个需登录）
+- 鉴权 / Auth: 匿名可报价；预约下单需 OAuth 2.1 + PKCE（动态客户端注册）
+- 覆盖 / Coverage: 800+ 家体检机构，240+ 城市，其中 540+ 家已接入 API 可被 AI 直接预约
+- 文档 / Docs: https://github.com/ryanbihai/haola-checkup-mcp
+- 官网 / Website: https://www.ihaola.com.cn/
+- 完整能力说明: https://www.ihaola.com.cn/llms-full.txt
+- OpenAPI: https://www.ihaola.com.cn/openapi.json
+
+## 两个场景 / Two flows
+
+企业 / Enterprise: plan_quotation 按人均预算出分档方案 → 返回 planId
+个人 / Personal: plan_recommend 按年龄性别症状预算出方案 → 返回 planId
+两者都能接 reservation_book 直接预约 / Both feed reservation_book to book
+
+## 联系方式 / Contact
+
+北京好啦科技有限公司 · contacts@haola.com · 136 6197 6946

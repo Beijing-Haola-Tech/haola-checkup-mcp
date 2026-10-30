@@ -1,0 +1,669 @@
+[
+  {
+    "name": "vendor_list",
+    "description": "[匿名可调用] 查门店地址。支持三种方式，至少传一种：1) hospitalCode（可带 vendorids，按第一个品牌查）；2) longitude+latitude（可带 radius 米，默认 50000，可带 vendorids）；3) province/city/district（可带 vendorids）。外部调用仅支持 health100/haolaruici，partnerid 仅内部可用。不确定品牌和覆盖城市时先用 vendor.brands。本体: vendor → Action: list",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "city": {
+          "type": "string"
+        },
+        "province": {
+          "type": "string"
+        },
+        "district": {
+          "type": "string"
+        },
+        "hospitalCode": {
+          "type": "string"
+        },
+        "longitude": {
+          "type": "number"
+        },
+        "latitude": {
+          "type": "number"
+        },
+        "radius": {
+          "type": "number"
+        },
+        "vendorids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "vendor_brands",
+    "description": "[匿名可调用] 查各体检品牌覆盖的城市（品牌聚合摘要，不返回具体门店）。本体: vendor → Action: brands",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {}
+    }
+  },
+  {
+    "name": "order_list",
+    "description": "[需要登录] 查订单。查询 userOrders 集合。调用方归属甲方由服务端身份解析，filter 中无需传 partnerid。支持 $gte/$lte 日期范围、$in/$or 多值匹配。本体: order → Action: list\n\n鉴权：需要用户登录令牌，或已经绑定用户的云市场实例凭证。未登录调用返回 401；云市场实例未绑定用户时返回 code=40003 和 data.bindUrl。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "limit": {
+          "type": "number"
+        },
+        "page": {
+          "type": "number"
+        },
+        "filter": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      }
+    }
+  },
+  {
+    "name": "welfare_list",
+    "description": "[需要登录] 查用户体检件。查询 userWelfare 集合。传 {customerMobile: \"138xxx\"} 或 {name: \"张三\"} 查对应用户的体检件。已知 userid 可直接传 {userid: \"xxx\"}。本体: welfare → Action: list\n\n鉴权：需要用户登录令牌，或已经绑定用户的云市场实例凭证。未登录调用返回 401；云市场实例未绑定用户时返回 code=40003 和 data.bindUrl。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "ID": {
+          "type": "string"
+        },
+        "partnerid": {
+          "type": "string"
+        },
+        "userid": {
+          "type": "string"
+        },
+        "serviceid": {
+          "type": "string"
+        },
+        "rootid": {
+          "type": "string"
+        },
+        "mobile": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "corp_inquiry",
+    "description": "[匿名可调用] 提交企业商务咨询。企业客户有任何问题（合作咨询、产品了解、报价请求、投诉建议）均可提交，销售 24h 内联系。本体: corp → Action: inquiry",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "company": {
+          "type": "string"
+        },
+        "contact": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "employees": {
+          "type": "number"
+        },
+        "city": {
+          "type": "string"
+        },
+        "budget": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "company",
+        "contact",
+        "phone"
+      ]
+    }
+  },
+  {
+    "name": "corp_contact",
+    "description": "[匿名可调用] 查询好啦商务对接人（团检/商务合作）：返回对接人姓名、电话、邮箱、二维码图片 URL。用户报价后需要人工商务对接时调用。本体: corp → Action: contact",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {}
+    }
+  },
+  {
+    "name": "plan_quotation",
+    "description": "[匿名可调用] 企业团检报价：quotes 为对象数组，每档一个方案。每项 = { tier(档名，仅标识该档、不参与报价，返回时回填), budget(人均预算元，必填), healthConcerns(该档健康诉求，必填), populations?(人群数组 man/lady/girl，默认三人，该档) }。可选 partnerId（甲方 UUID），透传给 /plan/quotation 按伙伴定价。返回 data.list（每档 { tier, budget, planList, combinedPrice, discount }），其中 planList 为**按人群的数组**（每项 { population, price, items, planId }），逐档按人群拆分并发取值；planId 是该档该人群的方案标识，体检预约时传给 reservation.book，不要自己拼项目；discount 为该伙伴折数（如 5 表示 5 折，无则 null）。调用前先用 knowledge_get({uri:\"objects/checkup-proposal\"}) 加载《企业团检方案顾问》引导词作为 agent 的 system prompt；对客话术与输出模板必须遵循该引导词，严禁编造项目/费用。字段说明见 knowledge://objects/checkup-proposal。本体: plan → Action: quotation",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "quotes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "partnerId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "quotes"
+      ]
+    }
+  },
+  {
+    "name": "plan_recommend",
+    "description": "[需要登录] 个人体检推荐：按调用方身份读用户名下体检件与模板，结合性别、婚姻状况、预算、健康诉求推荐体检项目，返回 data.selected_items（每项带 constraintId）与 planId。planId 直接传给 reservation.book 预约，不要自己拼项目。长耗时，建议每阶段调用 progress.report。本体: plan → Action: recommend\n\n鉴权：需要用户登录令牌，或已经绑定用户的云市场实例凭证。未登录调用返回 401；云市场实例未绑定用户时返回 code=40003 和 data.bindUrl。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "gender": {
+          "type": "string"
+        },
+        "marital": {
+          "type": "string"
+        },
+        "age": {
+          "type": "number"
+        },
+        "budget": {
+          "type": "number"
+        },
+        "mainComplaint": {
+          "type": "string"
+        },
+        "reportHistory": {
+          "type": "string"
+        },
+        "userContext": {
+          "type": "string"
+        },
+        "welfareid": {
+          "type": "string"
+        },
+        "modification": {
+          "type": "string"
+        },
+        "previousPackage": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        }
+      },
+      "required": [
+        "gender"
+      ]
+    }
+  },
+  {
+    "name": "faq",
+    "description": "[匿名可调用] 体检 FAQ。不传 query 则列出所有问题。query 必须是短关键词(2-4字，如\"报告\"、\"预约\"、\"空腹\")，不要传完整问句。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "query": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "knowledge_get",
+    "description": "[匿名可调用] 按需查询领域知识。外部可用 URI: enums(状态码) / objects/contact(联系人) / objects/contact-profile(健康画像) / objects/checkup-proposal(企业团检方案顾问引导词)。查 action 参数用 help()。团检报价场景先用 knowledge_get({uri:\"objects/checkup-proposal\"}) 加载《企业团检方案顾问》引导词作为外部 MCP agent 的 system prompt，再调 plan_quotation；报价话术与输出模板必须遵循该引导词",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "uri": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "help",
+    "description": "[匿名可调用] 三级帮助系统。无参列出本体；传 ontology 列出该本体下工具；传 ontology 和 sub_action 查看参数，sub_action 用完整名称，如 vendor.list、plan.quotation。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "ontology": {
+          "type": "string"
+        },
+        "sub_action": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "welfare_detail",
+    "description": "[需要登录] 查询指定福利的详细内容，包括检查项目列表、规则说明、适用机构等。本体: welfare → Action: detail\n\n鉴权：需要用户登录令牌，或已经绑定用户的云市场实例凭证。未登录调用返回 401；云市场实例未绑定用户时返回 code=40003 和 data.bindUrl。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "welfareid": {
+          "type": "string"
+        },
+        "vendorid": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "welfareid"
+      ]
+    }
+  },
+  {
+    "name": "cautions",
+    "description": "[需要登录] 根据体检项目查询注意事项（饮食、用药、禁忌等）。需调用方用户标识（external_user_id 自动注入），partnerid 由服务端按用户标识解析，禁止客户端传。传 checkPackage 查套餐注意事项（必带 vendorid）；传 serviceid 仅允许查本人订单。本体: knowledge → Action: cautions\n\n鉴权：需要用户登录令牌，或已经绑定用户的云市场实例凭证。未登录调用返回 401；云市场实例未绑定用户时返回 code=40003 和 data.bindUrl。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "checkPackage": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "vendorid": {
+          "type": "string"
+        },
+        "serviceid": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "order_detail",
+    "description": "[需要登录] 查询单个订单完整详情，包括预约信息、医院信息、套餐项目、支付状态。本体: order → Action: detail\n\n鉴权：需要用户登录令牌，或已经绑定用户的云市场实例凭证。未登录调用返回 401；云市场实例未绑定用户时返回 code=40003 和 data.bindUrl。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "serviceid": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "serviceid"
+      ]
+    }
+  },
+  {
+    "name": "contact_list",
+    "description": "[需要登录] 按 relation/gender 查询当前用户的联系人。用户提到家人时必须先调用；唯一候选可直接使用 contactid，多个候选请用户选择，未选定时禁止保存画像。本体: contact → Action: list\n\n鉴权：需要用户登录令牌，或已经绑定用户的云市场实例凭证。未登录调用返回 401；云市场实例未绑定用户时返回 code=40003 和 data.bindUrl。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "relation": {
+          "type": "string"
+        },
+        "gender": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "contact_get",
+    "description": "[需要登录] 查询指定就诊人的完整信息（含脱敏证件号）。本体: contact → Action: get\n\n鉴权：需要用户登录令牌，或已经绑定用户的云市场实例凭证。未登录调用返回 401；云市场实例未绑定用户时返回 code=40003 和 data.bindUrl。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "contactid": {
+          "type": "string"
+        },
+        "contactId": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "contact_create",
+    "description": "[需要登录] 创建家属临时联系人。relation 必填，self 由系统创建；姓名、手机号、证件号可后补。本体: contact → Action: create\n\n鉴权：需要用户登录令牌，或已经绑定用户的云市场实例凭证。未登录调用返回 401；云市场实例未绑定用户时返回 code=40003 和 data.bindUrl。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "customerName": {
+          "type": "string"
+        },
+        "customerMobile": {
+          "type": "string"
+        },
+        "customerID": {
+          "type": "string"
+        },
+        "IDType": {
+          "type": "string"
+        },
+        "gender": {
+          "type": "string"
+        },
+        "birthday": {
+          "type": "string"
+        },
+        "marital": {
+          "type": "string"
+        },
+        "relation": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "relation"
+      ]
+    }
+  },
+  {
+    "name": "contact_update",
+    "description": "[需要登录] 更新就诊人信息（姓名、手机号等）。本体: contact → Action: update\n\n鉴权：需要用户登录令牌，或已经绑定用户的云市场实例凭证。未登录调用返回 401；云市场实例未绑定用户时返回 code=40003 和 data.bindUrl。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "contactid": {
+          "type": "string"
+        },
+        "contactId": {
+          "type": "string"
+        },
+        "customerName": {
+          "type": "string"
+        },
+        "customerMobile": {
+          "type": "string"
+        },
+        "customerID": {
+          "type": "string"
+        },
+        "IDType": {
+          "type": "string"
+        },
+        "gender": {
+          "type": "string"
+        },
+        "birthday": {
+          "type": "string"
+        },
+        "marital": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "contact_profile_get",
+    "description": "[需要登录] 按 contactid 查询联系人的结构化健康画像。不传 contactid 时读取当前用户本人。本体: contact → Action: profile.get\n\n鉴权：需要用户登录令牌，或已经绑定用户的云市场实例凭证。未登录调用返回 401；云市场实例未绑定用户时返回 code=40003 和 data.bindUrl。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "contactid": {
+          "type": "string"
+        },
+        "contactId": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "contact_profile_save",
+    "description": "[需要登录] 仅在用户明确要求保存或更新长期健康画像时调用；仅推荐方案不得调用。本人不传 contactid，家人必须先解析唯一 contactid，禁止把家人信息写入本人档案。返回更新后的完整画像与 created。本体: contact → Action: profile.save\n\n鉴权：需要用户登录令牌，或已经绑定用户的云市场实例凭证。未登录调用返回 401；云市场实例未绑定用户时返回 code=40003 和 data.bindUrl。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "contactid": {
+          "type": "string"
+        },
+        "contactId": {
+          "type": "string"
+        },
+        "demographics": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "measurements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "lifestyle": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "problem_list": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "family_history": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "allergy_intolerance": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "surgeries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "medications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "examinations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "preferences_constraints": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      }
+    }
+  },
+  {
+    "name": "reservation_book",
+    "description": "[需要登录] 体检预约：按 planId 取出项目，交给伙伴接口下单。传 contactId 时直接使用该就诊人。没有 contactId 时，支持 elicitation form 的客户端会先选择已有联系人，或选择新建后填写姓名、手机号、证件类型、证件号、授权、出生日期和性别；出生日期和性别仅在非身份证时必填，服务端在提交后校验。不支持的客户端会收到 contactEntryUrl，用户可在 H5 添加就诊人后重新发起预约。不要在对话中要求用户发送身份证号。IDType 为 SFZ 时按身份证规则校验。体检项目只来自 planId，客户端不能提交项目。返回 serviceid 作为预约订单号、orderEntryUrl 作为订单列表页链接：用户在 H5 用手机号登录后可看到自己的订单，并可支付、改期/取消、查看检前注意事项、查看体检报告。渠道需要用户支付时返回支付链接 payUrl 和支付提示；客户端支持 elicitation URL 时，服务端通过 URL 模式打开 payUrl，最终结果仍返回 orderEntryUrl，客户端不支持时直接返回 payUrl 和 orderEntryUrl。客户端可使用 payUrl 生成二维码展示给用户。payUrl 有效期为订单创建后 30 分钟。重复预约命中已有未支付订单时，返回原 serviceid 和该订单的 payUrl。status 表示支付状态，预约状态以 rsvStatus 为准。本体: reservation → Action: book\n\n鉴权：需要用户登录令牌，或已经绑定用户的云市场实例凭证。未登录调用返回 401；云市场实例未绑定用户时返回 code=40003 和 data.bindUrl。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "planId": {
+          "type": "string"
+        },
+        "hospitalCode": {
+          "type": "string"
+        },
+        "vendorid": {
+          "type": "string"
+        },
+        "appointmentDate": {
+          "type": "string"
+        },
+        "timespan": {
+          "type": "string"
+        },
+        "contactId": {
+          "type": "string"
+        },
+        "contactid": {
+          "type": "string"
+        },
+        "IDType": {
+          "type": "string"
+        },
+        "payType": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "planId",
+        "hospitalCode",
+        "vendorid",
+        "appointmentDate"
+      ]
+    }
+  },
+  {
+    "name": "reservation_cancel",
+    "description": "[需要登录] 取消预约：按预约号取消；已支付订单会同时发起退款。预约号取自 reservation.book 返回的 serviceid。本体: reservation → Action: cancel\n\n鉴权：需要用户登录令牌，或已经绑定用户的云市场实例凭证。未登录调用返回 401；云市场实例未绑定用户时返回 code=40003 和 data.bindUrl。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "reservationId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reservationId"
+      ]
+    }
+  },
+  {
+    "name": "reservation_modify",
+    "description": "[需要登录] 更改预约日期：按预约号改期。本体: reservation → Action: modify\n\n鉴权：需要用户登录令牌，或已经绑定用户的云市场实例凭证。未登录调用返回 401；云市场实例未绑定用户时返回 code=40003 和 data.bindUrl。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "reservationId": {
+          "type": "string"
+        },
+        "appointmentDate": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reservationId",
+        "appointmentDate"
+      ]
+    }
+  },
+  {
+    "name": "card_list",
+    "description": "[需要登录] 根据卡号查卡密及兑换使用情况。welfareId 为空=未兑换，非空时串联福利和订单。本体: card → Action: list\n\n鉴权：需要用户登录令牌，或已经绑定用户的云市场实例凭证。未登录调用返回 401；云市场实例未绑定用户时返回 code=40003 和 data.bindUrl。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "cardId": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "cardId"
+      ]
+    }
+  },
+  {
+    "name": "progress_report",
+    "description": "[匿名可调用] 长耗时任务进度上报。agent 每完成一个阶段调用一次，text 为给用户看的可读进度，如「报告解析中，预计 10 秒」。不落地业务数据，仅用于向用户展示过程。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "stage": {
+          "type": "string"
+        },
+        "percent": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "text"
+      ]
+    }
+  }
+]
