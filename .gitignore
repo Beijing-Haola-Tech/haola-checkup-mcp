@@ -6,3 +6,12 @@ node_modules/
 Thumbs.db
 .idea/
 .vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
