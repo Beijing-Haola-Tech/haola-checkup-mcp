@@ -52,16 +52,22 @@ def cmd_tools(args) -> int:
     print(f"可调用 {len(tools)} 个免登录工具\n")
     for t in tools:
         print(f"  {t['name']:<24}{_first_line(t.get('description', ''))}")
-    print("\n需要登录的动作（个人方案 / 预约 / 订单 / 报告）请在网页完成：")
-    print("  https://pe.ihaola.com.cn/auth/")
+    from . import auth as _auth
+    if _auth.access_token():
+        print("\n已登录：个人方案、预约、订单、报告都可以直接调用。")
+    else:
+        print("\n需要登录的动作（个人方案 / 预约 / 订单 / 报告）：先跑 python scripts/haola.py login")
     return 0
 
 
 def cmd_call(args) -> int:
-    if args.name not in ANONYMOUS_TOOLS:
-        print(f"`{args.name}` 不在允许范围内。", file=sys.stderr)
-        print("这个动作需要在网页上登录后完成：https://pe.ihaola.com.cn/auth/", file=sys.stderr)
-        print("可调用的工具：" + "、".join(sorted(ANONYMOUS_TOOLS)), file=sys.stderr)
+    from . import auth as _auth
+
+    logged_in = bool(_auth.access_token())
+    if args.name not in ANONYMOUS_TOOLS and not logged_in:
+        print(f"`{args.name}` 需要先登录。", file=sys.stderr)
+        print("在这个目录下跑一次：python scripts/haola.py login", file=sys.stderr)
+        print("可免登录调用的工具：" + "、".join(sorted(ANONYMOUS_TOOLS)), file=sys.stderr)
         return 5
 
     try:
@@ -76,7 +82,7 @@ def cmd_call(args) -> int:
         return 0
     except LoginRequired as e:
         print(f"{e}", file=sys.stderr)
-        print("请在网页上登录后完成：https://pe.ihaola.com.cn/auth/", file=sys.stderr)
+        print("在这台机器上跑一次：python scripts/haola.py login", file=sys.stderr)
         return 3
     except MCPError as e:
         print(f"调用失败：{e}", file=sys.stderr)
@@ -86,6 +92,40 @@ def cmd_call(args) -> int:
 def cmd_quote(args) -> int:
     with HaolaMCP(url=args.url) as mcp:
         _dump(mcp.quote(args.budget, args.concerns, args.populations, args.tier))
+    return 0
+
+
+def cmd_login(args) -> int:
+    import time
+    from . import auth
+
+    try:
+        tok = auth.login(timeout=args.timeout, open_browser=not args.no_browser)
+    except Exception as e:
+        print("登录失败：" + str(e))
+        return 1
+
+    print("登录成功，凭据已存到 " + auth.TOKEN_PATH)
+    exp = tok.get("expires_at")
+    if exp:
+        mins = max(1, int((exp - time.time()) // 60))
+        print("  有效期约 %d 分钟，过期后重新跑一次 login 即可" % mins)
+    return 0
+
+
+def cmd_logout(args) -> int:
+    from . import auth
+    print("已清除本地凭据" if auth.logout() else "本地没有凭据")
+    return 0
+
+
+def cmd_whoami(args) -> int:
+    from . import auth
+    t = auth.load_token()
+    if not t:
+        print("未登录")
+        return 1
+    print("已登录，凭据文件：", auth.TOKEN_PATH)
     return 0
 
 
@@ -107,6 +147,17 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("name", help="工具名，须在白名单内")
     sp.add_argument("json", nargs="?", default="", help='参数 JSON，如 \'{"city":"北京"}\'')
     sp.set_defaults(func=cmd_call)
+
+    sp = sub.add_parser("login", help="打开浏览器登录一次，之后自动带凭据")
+    sp.add_argument("--timeout", type=int, default=300)
+    sp.add_argument("--no-browser", action="store_true", help="只打印链接，不自动打开")
+    sp.set_defaults(func=cmd_login)
+
+    sp = sub.add_parser("logout", help="清除本地凭据")
+    sp.set_defaults(func=cmd_logout)
+
+    sp = sub.add_parser("whoami", help="查看是否已登录")
+    sp.set_defaults(func=cmd_whoami)
 
     # 只有白名单里包含 plan_quotation 的场景（企业版）才注册这个子命令
     if "plan_quotation" in ANONYMOUS_TOOLS:

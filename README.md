@@ -67,7 +67,7 @@ clawhub --workdir "$env:USERPROFILE\.workbuddy" install personal-checkup-booking
 | **Cursor** | `cursor://anysphere.cursor-deeplink/mcp/install?…`，点一下自动写入 |
 | **VS Code**（1.102+） | `vscode:mcp/install?…`，点一下自动写入 |
 | **Claude Code** | `claude mcp add --transport http haola-pe <url>` |
-| **WorkBuddy** | 手写 `~/.workbuddy/mcp.json` + 连接器管理里点一次「信任」（官方未开放深链）|
+| **WorkBuddy** | 对话里发「帮我连接 MCP：<地址>」即可，客户端自己添加并弹出授权，不用改配置 |
 | 其他客户端 | 填服务地址即可，见下方「怎么接」 |
 
 部署：把 `connect/` 目录传到站点根目录（如 `https://pe.ihaola.com.cn/connect/`）即可。

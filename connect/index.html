@@ -93,28 +93,20 @@
   </div>
 
   <div class="card">
-    <h3>WorkBuddy <span class="tag manual">需手动</span></h3>
-    <p>编辑 <code class="inl">%USERPROFILE%\.workbuddy\mcp.json</code>，保存后在「连接器管理」里点一次<b>信任</b>，再新开会话。</p>
+    <h3>WorkBuddy <span class="tag one">一句话</span></h3>
+    <p>在对话里直接发这句话，客户端会自己添加服务并弹出授权，<b>不用改配置文件</b>。</p>
     <div class="code">
-      <pre id="wb">{
-  "mcpServers": {
-    "haola-pe": {
-      "type": "streamableHttp",
-      "url": "https://ai.ihaola.com.cn/api/mcp/haola-pe",
-      "timeout": 60000,
-      "disabled": false
-    }
-  }
-}</pre>
+      <pre id="wb">帮我连接 MCP：https://ai.ihaola.com.cn/api/mcp/haola-pe</pre>
       <button class="btn" data-copy="wb">复制</button>
     </div>
+    <p style="margin:12px 0 0;font-size:13px">没反应再走手动：编辑 <code class="inl">%USERPROFILE%\.workbuddy\mcp.json</code>，保存后在「连接器管理」里点一次<b>信任</b>，再新开会话。</p>
   </div>
 
 </div>
 
 <div class="card" style="margin-top:14px">
   <h3>其他客户端</h3>
-  <p>任何支持远程 MCP（Streamable HTTP）的客户端，把本节开头那个地址填进去即可。手写配置时用这段：</p>
+  <p>任何支持远程 MCP（Streamable HTTP）的客户端都行。<b>先试一句话</b>：在对话里发「帮我连接 MCP：https://ai.ihaola.com.cn/api/mcp/haola-pe」，很多客户端会自己加好；没反应再手写下面这段。</p>
   <div class="code">
     <pre id="raw">{
   "mcpServers": {

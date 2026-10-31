@@ -4,7 +4,7 @@
 让 Skill 的脚本可以直接调用远端工具，不需要客户预先配置 MCP。
 
 设计约束（重要）：
-    - **只走免登录**。这个客户端不接受任何凭据，也不发送任何凭据。
+    - 默认只走免登录；用户在本机跑过 `login` 之后，请求会自动带上 Bearer。
     - 只允许调用一组固定的免登录工具，名单见 ANONYMOUS_TOOLS。
     - 需要登录的动作一律不在本地做，引导用户到网页完成。
 
@@ -102,6 +102,13 @@ class HaolaMCP:
         }
         if self.session_id:
             h["mcp-session-id"] = self.session_id
+        try:
+            from . import auth as _auth
+            tok = _auth.access_token()
+        except Exception:
+            tok = None
+        if tok:
+            h["Authorization"] = "Bearer " + tok
         return h
 
     def _post(self, payload: dict) -> dict | None:
@@ -119,7 +126,7 @@ class HaolaMCP:
             raw = e.read().decode("utf-8", "replace")
             msg = self._extract_error_message(raw) or e.reason or "request failed"
             if e.code == 401:
-                raise LoginRequired("该动作需要在网页上登录后完成，本客户端不处理。", status=401) from None
+                raise LoginRequired("需要登录后才能调用。在本机跑 `python scripts/haola.py login` 登录一次即可。", status=401) from None
             raise MCPError(msg, status=e.code) from None
 
     @staticmethod
@@ -208,6 +215,14 @@ class HaolaMCP:
         self._ready = True
         return result
 
+    @staticmethod
+    def _logged_in() -> bool:
+        try:
+            from . import auth as _auth
+            return bool(_auth.access_token())
+        except Exception:
+            return False
+
     def ensure_ready(self) -> None:
         if not self._ready:
             self.initialize()
@@ -216,11 +231,13 @@ class HaolaMCP:
         """列出工具。只保留白名单内的，白名单外的一律不呈现。"""
         self.ensure_ready()
         tools = self._rpc("tools/list", {}).get("tools", [])
+        if self._logged_in():
+            return tools
         return [t for t in tools if t.get("name") in ANONYMOUS_TOOLS]
 
     def call(self, name: str, arguments: dict | None = None) -> dict:
         """调用一个免登录工具，返回工具自己输出的 JSON（已解开 MCP 的 content 包装）。"""
-        if name not in ANONYMOUS_TOOLS:
+        if name not in ANONYMOUS_TOOLS and not self._logged_in():
             raise MCPError(
                 f"`{name}` 不在本客户端允许调用的范围内。这个动作需要在网页上登录后完成。",
                 code="not_allowed",
