@@ -2,33 +2,71 @@
 
 让 Agent 能出体检方案、报价格、预约门店。两个 Skill，共用同一个 MCP 服务。
 
+## 直接取文件（给 LLM / Agent 用）
+
+不用克隆仓库，读这两个 Markdown 就够：
+
+- 企业团检方案与报价　https://raw.githubusercontent.com/ryanbihai/haola-checkup-mcp/main/skills/corporate-checkup-quote/SKILL.md
+- 个人体检预约　　　　　https://raw.githubusercontent.com/ryanbihai/haola-checkup-mcp/main/skills/personal-checkup-booking/SKILL.md
+
+每个 `SKILL.md` 里都写全了：怎么连、有哪些工具、每个工具的参数约束、方案怎么读、
+哪些话不能说。同目录下的 `scripts/haola.py` 与 `src/haola_checkup/` 是零依赖 Python
+客户端（通道 B），客户端不支持 MCP 时用它直连，用户不用配置任何东西。
+
 ## 两个 Skill
 
-- `personal-checkup-booking` ·「好啦体检 · 个人体检预约」
-  个人 / 员工 / 代家人预约；按年龄、性别、婚否、预算出个性化方案；预约、改期、取消、查订单与报告
 - `corporate-checkup-quote` ·「好啦体检 · 企业团检方案与报价」
-  HR / 行政 / 采购；按人均预算出多档团检方案，逐档逐人群列出项目与金额；查覆盖；合同发票对接
+  HR / 行政 / 采购。按人均预算出多档团检方案，逐档逐人群列出项目与折后价；
+  查城市与门店覆盖；合同发票转商务对接。**全程免登录。**
+- `personal-checkup-booking` ·「好啦体检 · 个人体检预约」
+  个人 / 员工 / 代家人预约。按年龄、性别、婚否、预算出个性化方案；
+  选门店、预约、改期、取消；查订单与报告。
 
-在 ClawHub 搜索「好啦体检」即可找到。
+在 ClawHub 也是这两个：
+
+- https://clawhub.ai/ryanbihai/skills/corporate-checkup-quote
+- https://clawhub.ai/ryanbihai/skills/personal-checkup-booking
+
+## 这两个 Skill 处理什么问题
+
+- 公司要给员工做体检，人均预算 800 / 1500，出几档方案
+- 我们是 HR，两千人分布在全国，怎么排
+- 北京 / 上海 / 成都有哪些可以约的体检门店
+- 帮我约个体检，最近总是头晕，预算 800
+- 去年的体检报告在哪里看
+- 员工个人想做体检，和公司团检是两回事吗
+
+分界：**企业团检（按人均预算出多档）走 `corporate-checkup-quote`；
+个人方案、预约、查报告走 `personal-checkup-booking`。**
 
 ## 依赖的服务
 
 - MCP 端点（Streamable HTTP）：https://ai.ihaola.com.cn/api/mcp/haola-pe
-- 客户端：零依赖 Python，`pip install haola-checkup`，或直接用 `scripts/haola.py`
-- 免登录：报价、门店、FAQ、领域知识、企业咨询
-- 需登录：个人方案、预约、订单、报告、体检人 —— 在网页上完成，验证码不经对话
+- 协议版本 `2025-06-18`，25 个工具
+- 免登录 9 个：`plan_quotation` `vendor_brands` `vendor_list` `knowledge_get` `faq`
+  `corp_inquiry` `corp_contact` `help` `progress_report`
+- 需登录 16 个：个人方案、预约、改期取消、订单、体检件、就诊人、检前注意事项、卡密
+  —— 登录在网页上完成，验证码不经对话
+- 客户端：零依赖 Python 3.9+，`pip install haola-checkup`，或直接用 `scripts/haola.py`
 
 ## 覆盖
 
-800+ 家体检机构，240+ 城市，其中 540+ 家已接入 API 可被 AI 直接预约。
-体检服务每年 10 万人次，健康测评累计 3500 万人次。
+800+ 家合作体检机构，240+ 城市，其中 540+ 家已接入 API、可被 AI 直接查询和预约。
+体检服务每年 10 万人次；健康测评累计 3500 万人次。
 
 ## 文件
 
-- `skills/<slug>/SKILL.md` — 发布产物
+- `skills/<slug>/SKILL.md` — 发布产物，自包含
+- `skills/<slug>/scripts/` `skills/<slug>/src/` — 自带的零依赖客户端
 - `tools/tools.json` — 25 个工具定义
 - `examples/` — curl / Cursor / Claude Desktop 接入示例
+- `README.md` — 人看的说明（含设计约束与合规边界）
+
+## 边界
+
+不编造体检项目、价格、门店、订单、报告；不做疾病诊断；不向用户索取验证码、密码、证件号；
+数据只提交给本 Skill 声明的 MCP 端点。企业侧看不到任何个人体检结果。
 
 ## 联系
 
-北京好啦科技有限公司 · contacts@haola.com · 136 6197 6946
+北京好啦科技有限公司 · contacts@haola.com · 136 6197 6946 · https://www.ihaola.com.cn/

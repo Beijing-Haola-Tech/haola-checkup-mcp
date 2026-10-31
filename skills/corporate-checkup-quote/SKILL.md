@@ -107,6 +107,8 @@ python scripts/haola.py quote --budget 800 --concerns "久坐、三高"
 {"mcpServers":{"haola-pe":{"url":"https://ai.ihaola.com.cn/api/mcp/haola-pe"}}}
 ```
 
+参数不确定时，先看 `tools/list` 返回的 `inputSchema`；还不够就调 `help`。**不要凭记忆猜参数名。**
+
 ## 连接自检
 
 连接失败时按顺序做，**不要用"网页能不能打开"判断可用性**。
@@ -177,6 +179,73 @@ python scripts/haola.py quote --budget 800 --concerns "久坐、三高"
 | `reservation_cancel` | 取消预约 | [登] |
 | `reservation_modify` | 修改预约日期 | [登] |
 | `card_list` | 按卡号查卡密与兑换情况 | [登] |
+
+## 返回字段（各工具不同，别假设统一形状）
+
+| 工具 | 列表在哪个字段 |
+|---|---|
+| `plan_quotation` | `data.list[]`，每档再套 `planList[]` |
+| `vendor_list` | `data.hospitals` |
+| `vendor_brands` | `data.vendors` |
+| `faq` | `data.matches` |
+| `knowledge_get`（不带 uri） | `data.resources` |
+
+**这几个字段名不一样，是服务端现状。** 解析前先看这次实际返回的 key——不要因为 `plan_quotation` 是 `list`，就假设别的也是 `list`。按错的字段解析会得到空数组，看起来像"查不到"，其实数据是有的。
+
+## 方案怎么读：三类项目与预算
+
+`plan_recommend` 的每个项目自带两个判别字段，**必须读，不能只看价格**：
+
+| 字段 | 取值 | 含义 |
+|---|---|---|
+| `constraint_id` | `mandatory` | 体检件或合同强制要求，**不能删** |
+| | `selected` | 按用户情况选中，可增可减 |
+| `reason` | `Required by contract` | 合同强制，同 `mandatory` |
+| | `Budget fill` | **为把预算用掉而额外加的项** |
+| | 具体理由 + 「依据：…」 | 针对用户情况，带文献依据 |
+
+### 「够用方案」的算法
+
+```
+够用方案 = selected_items 里所有 reason ≠ "Budget fill" 的项目
+用满方案 = selected_items 全部
+```
+
+差额就是 `Budget fill` 项目的金额合计。
+
+实测参考（41 岁男性，主诉血糖偏高、过敏性鼻炎、轻度脂肪肝）：
+
+| 预算 | 总项 | 凑数项 | 凑数金额 | 去掉凑数后 |
+|---|---|---|---|---|
+| 800 | 16 | 1 | 3 元 | 794 元 |
+| 2000 | 23 | 6 | 1117 元 | 883 元 |
+| 3000 | 28 | 7 | 1661 元 | 1339 元 |
+
+**低预算时几乎不需要凑数，预算越高凑数占比越大**——所以「用满」在 800 元档几乎等于「够用」，在 2000 元以上就未必。
+
+### 余额看 `cost_summary`，不要自己逐项加总
+
+```
+cost_summary = { totalSpent, remaining, overBudgetExtra }
+```
+
+- `remaining > 0`：没用满
+- `overBudgetExtra > 0`：超预算了
+
+### 绝对不要用 `adjustedScore` 当价值判断
+
+`plan_quotation` 的项目带 `adjustedScore`，它是**「与所述健康关注点的贴合度」，不是必要性**。
+
+实测反例（3000 元档男性方案）：
+
+```
+内科            ¥8.8     score=68   ← 分数最高
+彩超（心脏）     ¥216.44  score=51
+空腹血糖（GLU）  ¥7.74    score=36   ← 基础必需项，分数很低
+一般检查        ¥11.415  score=32
+```
+
+按分数排序会**丢掉空腹血糖、留下内科**。判断必要性只能靠 `constraint_id` 和 `reason`。
 
 ## 工具调用要点
 
@@ -380,6 +449,30 @@ https://pe.ihaola.com.cn/auth/
 - 人均预算
 - 健康诉求（久坐、颈椎、职业病、女员工占比等）
 
+> **健康诉求只要群体层面的，不要个人层面的。**
+>
+> - 可以问：久坐、颈椎、夜班、女性占比、年龄段分布、行业常见职业病
+> - **不要问、不要记录、不要转述**：任何单个员工的姓名、工号、诊断、病史、体检异常
+> - 如果客户主动贴了具体病历或某个员工的结果，**不要把它写进 `healthConcerns`**，只说「这部分不用于报价，如需个案处理请走单人流程」
+>
+> 原因：`plan_quotation` 会把 `healthConcerns` 原样发给远端服务，报价只需要人群画像，不需要个体健康数据。
+
+### 第 1.5 步｜提交前确认
+
+调 `plan_quotation` 之前，把**将要发送的字段**原样展示给用户，取得确认再发：
+
+```
+即将提交给好啦体检服务：
+  档位数：2
+  人均预算：800 / 1500
+  健康关注：久坐、颈椎不适
+  人群：男 / 女已婚 / 女未婚
+
+确认后我就出方案。
+```
+
+用户确认前不要调用。
+
 ### 第 2 步｜问档位数量
 
 由 HR 决定要几个档位（1–N 档）。**不要替客户定档数。**
@@ -404,11 +497,21 @@ https://pe.ihaola.com.cn/auth/
 
 ### 第 5 步｜读懂返回
 
+`plan_quotation` 的返回：
+
 ```
-list[]
+data.list[]
 └─ 每档 { tier, budget, combinedPrice, discount, planList[] }
    └─ 每个 planList 项 { population, price, items[], planId }
 ```
+
+> **不要假设所有工具都返回 `data.list`。** 每个工具的信封字段不一样（见「工具调用要点」的返回字段表）。拿不准就这次调用实际返回什么就读什么，不要按别的工具的形状去解析。
+
+> **企业路径的项目没有 `reason` 和 `constraint_id`**，只有 `itemId / name / price / adjustedScore`。所以这里：
+>
+> - **无法区分「必需项」和「凑数项」**——不用去找标记，没有
+> - **也不能用 `adjustedScore` 排序当价值判断**（实测 3000 元档：内科 68 分、空腹血糖 36 分，按分数排会丢掉基础项）
+> - HR 场景要的就是「用足人均预算」，直接给全量即可，不需要筛
 
 要点：
 

@@ -9,6 +9,21 @@
 
 ---
 
+## 给 Agent / LLM 取用
+
+不用克隆仓库，直接读这两个文件：
+
+- 企业团检　`https://raw.githubusercontent.com/ryanbihai/haola-checkup-mcp/main/skills/corporate-checkup-quote/SKILL.md`
+- 个人体检　`https://raw.githubusercontent.com/ryanbihai/haola-checkup-mcp/main/skills/personal-checkup-booking/SKILL.md`
+
+`raw.githubusercontent.com` 取不到时，用 GitHub 页面：
+`https://github.com/ryanbihai/haola-checkup-mcp/blob/main/skills/<slug>/SKILL.md`
+
+每个 skill 目录都是**自包含**的——`SKILL.md` 加一份零依赖客户端，单独拷走也能跑。
+更多见 [skills/README.md](skills/README.md)。
+
+---
+
 ## 两个 Skill
 
 同名服务，两种场景，各自独立安装：
@@ -108,19 +123,26 @@ python scripts/haola.py quote --budget 800 --concerns "久坐、三高"
 ```
 .
 ├── skills/
-│   ├── personal-checkup-booking/SKILL.md     # 个人版（发布产物）
-│   └── corporate-checkup-quote/SKILL.md      # 企业版（发布产物）
+│   ├── README.md                             # 索引：两个 skill 各是什么、怎么取
+│   ├── personal-checkup-booking/             # 个人版（自包含，可单独拷走）
+│   │   ├── SKILL.md                          #   给模型读的说明书
+│   │   ├── mcp.json                          #   客户端配置片段
+│   │   ├── scripts/haola.py                  #   免安装启动器
+│   │   └── src/haola_checkup/                #   client.py / cli.py / __init__.py
+│   └── corporate-checkup-quote/              # 企业版（同上，自包含）
 ├── src/haola_checkup/
 │   ├── client.py                             # MCP 客户端（仅免登录）
 │   └── cli.py                                # 命令行
 ├── scripts/haola.py                          # 免安装启动器
 ├── tools/tools.json                          # 25 个工具的定义
 ├── examples/                                 # curl / Cursor / Claude Desktop
-├── llms.txt
+├── llms.txt                                  # 给 LLM 的入口说明
 └── pyproject.toml
 ```
 
-`skills/*/SKILL.md` 是发布到 ClawHub 的产物，由内部构建流水线生成后同步过来，**不要在这里直接改**——改了会被下次同步覆盖。
+`skills/<slug>/` 整个目录是发布到 ClawHub 的产物，由内部构建流水线生成后同步过来，
+**不要在这里直接改**——改了会被下次同步覆盖。仓库根目录的 `src/`、`scripts/`、
+`tools/` 是同一份客户端的手工维护版，给 pip 安装和示例用。
 
 ---
 
