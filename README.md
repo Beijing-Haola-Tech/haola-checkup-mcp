@@ -1,81 +1,30 @@
-# 好啦体检 Skill · Haola Checkup Skill
+# 好啦体检 Skill · Haola Checkup Skills
 
-> **跟 AI 说清预算和身体状况，直接出体检方案并完成预约。**
-> Tell your agent a budget and a health concern — get a checkup plan and a booking.
+> 让 AI 直接出体检方案、报价格、预约门店。两个 Skill，共用同一个 MCP 服务。
+> Agent skills for checkup planning, quoting and booking — powered by the Haola Checkup MCP service.
 
+[![ClawHub](https://img.shields.io/badge/ClawHub-好啦体检-blue)](https://clawhub.ai/ryanbihai/skills/personal-checkup-booking)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.9%2B-blue)](pyproject.toml)
-[![Deps](https://img.shields.io/badge/dependencies-none-success)](#为什么没有依赖)
-[![Tools](https://img.shields.io/badge/tools-25-green)](tools/tools.json)
+[![Deps](https://img.shields.io/badge/python%20deps-none-success)](#为什么没有依赖)
 
 ---
 
-## 这是什么
+## 两个 Skill
 
-一个 **Agent Skill**：让 AI 能出体检方案、报价格、预约门店。
+同名服务，两种场景，各自独立安装：
 
-- **企业场景** —— 给一个人均预算，出全公司分档方案（男 / 女已婚 / 女未婚分开，价格到单项），返回 `planId`
-- **个人场景** —— 给年龄、性别、症状、预算，出定制方案，返回 `planId`
-- **两种都能直接预约** —— 把 `planId` 交给预约工具，在 240+ 城市、540+ 家已接入门店下单
-- **还能查** 订单、体检件、检前注意事项
+| Skill | 面向 | 能做什么 | 安装 |
+|---|---|---|---|
+| **好啦体检 · 个人体检预约** | 个人 / 员工 / 代家人预约 | 按年龄、性别、婚否、预算出个性化方案；查门店；预约、改期、取消；查订单与报告 | `personal-checkup-booking` |
+| **好啦体检 · 企业团检方案与报价** | HR / 行政 / 采购 | 按人均预算出多档团检方案，逐档逐人群列出项目与金额；查城市与门店覆盖；合同发票对接 | `corporate-checkup-quote` |
 
-Skill 自带一个零依赖的 Python 客户端，运行时调用好啦体检的 MCP 服务（Streamable HTTP）。**用户不需要预先配置 MCP**，装好这个 Skill 就能用。
-
-> 体检服务每年 10 万人次，健康测评累计 3500 万人次。合作体检机构 800+ 家，其中 540+ 家已接入 API 可被 AI 直接预约。
+在 ClawHub 搜索「**好啦体检**」即可找到两个。
 
 ---
 
-## 快速开始
+## 怎么接
 
-```bash
-# 1. 不用装，直接跑
-python scripts/haola.py ping
-python scripts/haola.py quote --budget 800 --concerns "久坐、三高、亚健康"
-
-# 2. 或者装成包
-pip install haola-checkup
-haola-checkup tools
-```
-
-三行就能看到真实返回：
-
-```
-连接成功：https://ai.ihaola.com.cn/api/mcp/haola-pe
-  session      0fe480f6-8622-45ff-8da5-8ba9deeeddba
-  server       haola-pe 1.0.0
-  protocol     2025-06-18
-  鉴权         匿名
-```
-
-```bash
-$ python scripts/haola.py quote --budget 800 --concerns "久坐、三高"
-  man      798.36 元  20 项
-  lady     779.93 元  19 项
-  girl     798.35 元  19 项
-```
-
----
-
-## Agent 怎么用它
-
-给 Agent 的完整契约在 **[`SKILL.md`](SKILL.md)** —— 什么情况下该用、什么时候不该用、四条主流程、三条回答规矩、错误对照表。
-
-装进 Claude Code / Cursor / 其他支持 Agent Skills 的客户端时，把 `SKILL.md` 放在 skill 目录根部即可。
-
-在代码里：
-
-```python
-from haola_checkup import HaolaMCP, AuthRequired
-
-with HaolaMCP() as mcp:                      # 匿名
-    result = mcp.quote(800, "久坐、三高")
-    for p in result["data"]["list"][0]["planList"]:
-        print(p["population"], p["price"], p["planId"])
-```
-
----
-
-## 端点与鉴权
+两个 Skill 共用同一个 MCP 服务：
 
 ```
 https://ai.ihaola.com.cn/api/mcp/haola-pe
@@ -85,50 +34,72 @@ https://ai.ihaola.com.cn/api/mcp/haola-pe
 |---|---|
 | 传输 | Streamable HTTP |
 | 协议版本 | `2025-06-18` |
-| 匿名可用 | 9 个工具 |
-| 需登录 | 16 个工具（预约、订单、体检件、就诊人） |
-| 鉴权方式 | OAuth 2.1 + PKCE，动态客户端注册（RFC 7591） |
-| 发现机制 | `401` 带 `WWW-Authenticate`，指向受保护资源元数据（RFC 9728） |
+| 免登录工具 | 9 个（个人版客户端只放行其中 6 个）|
+| 需登录动作 | 个人方案、预约、订单、报告、体检人 |
+| 覆盖 | 800+ 家体检机构 / 240+ 城市 / 其中 540+ 家可被 AI 直接预约 |
 
-本 Skill 的客户端**支持令牌透传**：拿到 token 后用 `HAOLA_TOKEN` 环境变量传入，或 `HaolaMCP(token=...)`。
+### 两条连接通道
 
-OAuth 授权需要**手机号 + 短信验证码**，所以登录这一步必须有人参与。**匿名出方案和报价全程无需人工。**
+**通道 A · 客户端已配置 MCP**（优先）
 
-遇到需要登录时，客户端抛 `AuthRequired`，并带上服务端给出的授权地址：
+把上面的地址加进支持 MCP 的客户端即可。Claude Code 一行：
 
+```bash
+claude mcp add --transport http haola-checkup https://ai.ihaola.com.cn/api/mcp/haola-pe
 ```
-需要登录：HTTP 401: 该工具需要登录令牌。Unauthorized: authorization required
-授权信息：https://ai.ihaola.com.cn/.well-known/oauth-protected-resource/api/mcp/haola-pe
+
+**通道 B · 客户端没有 MCP** → 用 Skill 自带的客户端
+
+零依赖 Python 客户端，直连同一个端点，用户不需要配置任何东西：
+
+```bash
+python scripts/haola.py ping
+python scripts/haola.py quote --budget 800 --concerns "久坐、三高"
 ```
 
 ---
 
-## 工具
+## 设计上的三条硬约束
 
-25 个。每个工具的描述都以 `[匿名可调用]` 或 `[需要登录]` 开头。
+这套东西最容易出问题的地方是「文档里写了限制，代码里没有」。所以三条约束都做进了代码：
 
-机器可读定义：[`tools/tools.json`](tools/tools.json)
+**① 客户端不接受任何凭据**
 
-| 分组 | 工具 |
+没有 token 参数，不读环境变量，不发 `Authorization` 头。凭据不经过这个客户端。
+
+**② 工具白名单是硬的**
+
+每个 Skill 的白名单直接写进产物的 `client.py`：
+
+| Skill | 白名单 |
 |---|---|
-| 方案与报价 | `plan_quotation`（企业，匿名）· `plan_recommend`（个人，需登录） |
-| 门店 | `vendor_brands` · `vendor_list`（匿名） |
-| 预约 | `reservation_book` · `reservation_modify` · `reservation_cancel` |
-| 订单 | `order_list` · `order_detail` |
-| 体检件 | `welfare_list` · `welfare_detail` |
-| 就诊人 | `contact_list` · `contact_get` · `contact_create` · `contact_update` |
-| 健康画像 | `contact_profile_get` · `contact_profile_save` |
-| 其他 | `cautions` · `card_list` · `faq` · `knowledge_get` · `help` · `corp_inquiry` · `corp_contact` · `progress_report` |
+| 个人版 | `vendor_list` `vendor_brands` `knowledge_get` `faq` `help` `progress_report` |
+| 企业版 | 上面 6 个 + `plan_quotation` `corp_inquiry` `corp_contact` |
+
+名单外的工具名会被直接拒绝，不是靠文档说“请不要调用”。
+
+**③ 登录只在网页上发生**
+
+需要登录的动作引导用户到网页完成，四步：
+
+1. 填手机号
+2. 点「获取验证码」→ 弹出图形验证码
+3. 填图形验证码 → 此时才会收到短信
+4. 填短信验证码 → 点「登录」
+
+登录入口：`https://pe.ihaola.com.cn/auth/`
+
+**验证码、密码、证件号一律不向用户索取，也不经对话传递。**
 
 ---
 
 ## 为什么没有依赖
 
-客户端只用标准库（`urllib` / `json`），原因：
+客户端只用标准库（`urllib` / `json`）。原因：
 
-1. **Skill 要在陌生环境里跑** —— 预装依赖是 Agent 场景最大的失败源
-2. **MCP Streamable HTTP 的握手很薄** —— init 一次、带 `mcp-session-id`、解析 SSE 的 `data:` 行，就这些
-3. **审计面小** —— 供应链风险为零，企业客户容易过审
+1. Skill 要在陌生环境里跑，预装依赖是 Agent 场景最大的失败源
+2. MCP Streamable HTTP 的握手很薄——initialize 一次、带 `mcp-session-id`、解析 SSE 的 `data:` 行
+3. 审计面小，供应链风险为零
 
 ---
 
@@ -136,31 +107,35 @@ OAuth 授权需要**手机号 + 短信验证码**，所以登录这一步必须�
 
 ```
 .
-├── SKILL.md              # Agent 的契约（放 skill 目录根部）
-├── README.md             # 本文件
-├── pyproject.toml
-├── scripts/
-│   └── haola.py          # 免安装启动器
+├── skills/
+│   ├── personal-checkup-booking/SKILL.md     # 个人版（发布产物）
+│   └── corporate-checkup-quote/SKILL.md      # 企业版（发布产物）
 ├── src/haola_checkup/
-│   ├── client.py         # MCP Streamable HTTP 客户端
-│   └── cli.py            # 命令行
-├── tools/tools.json      # 25 个工具的定义
-├── examples/             # curl / Cursor / Claude Desktop
-└── llms.txt
+│   ├── client.py                             # MCP 客户端（仅免登录）
+│   └── cli.py                                # 命令行
+├── scripts/haola.py                          # 免安装启动器
+├── tools/tools.json                          # 25 个工具的定义
+├── examples/                                 # curl / Cursor / Claude Desktop
+├── llms.txt
+└── pyproject.toml
 ```
+
+`skills/*/SKILL.md` 是发布到 ClawHub 的产物，由内部构建流水线生成后同步过来，**不要在这里直接改**——改了会被下次同步覆盖。
 
 ---
 
 ## 开发
 
 ```bash
-# 免安装直接跑
-$env:PYTHONPATH="src"; python -m haola_checkup.cli tools
+pip install haola-checkup          # 或直接用 scripts/haola.py
+haola-checkup ping
+haola-checkup tools
+haola-checkup quote --budget 800 --concerns "久坐、三高"
+```
 
-# 或
-python scripts/haola.py quote --budget 800 --concerns "久坐"
+打包：
 
-# 打包（发 PyPI 前）
+```bash
 pip install build
 python -m build
 twine upload dist/*
@@ -173,7 +148,7 @@ twine upload dist/*
 | | |
 |---|---|
 | 官网 | https://www.ihaola.com.cn/ |
-| AI 入口 | https://www.ihaola.com.cn/llms.txt |
+| AI / agent 入口 | https://www.ihaola.com.cn/llms.txt |
 | 完整能力说明 | https://www.ihaola.com.cn/llms-full.txt |
 | OpenAPI | https://www.ihaola.com.cn/openapi.json |
 | 企业团检落地页 | https://www.ihaola.com.cn/html/mcp-quote.html |
@@ -185,7 +160,7 @@ twine upload dist/*
 - 好啦科技**不做保险产品、不做医疗服务**，是体检服务的方案与预约层；实际体检由合作机构提供，均持《医疗机构执业许可证》
 - 体检报告以结构化方式交付，**企业侧只能看到授权后的脱敏汇总，看不到任何个人体检结果**
 - 国家等保三级 · ISO 27001 · ISO 9001 · 国家高新技术企业 · 北京市专精特新
-- 本仓库是**客户端与文档**，不含用户数据，也不含服务端源码
+- 本仓库是**客户端与 Skill 定义**，不含用户数据，也不含服务端源码
 
 ---
 

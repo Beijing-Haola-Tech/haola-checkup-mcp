@@ -3,33 +3,46 @@
 只做一件事：把 MCP Streamable HTTP 的握手、会话、SSE 解析包起来，
 让 Skill 的脚本可以直接调用远端工具，不需要客户预先配置 MCP。
 
-用法::
+设计约束（重要）：
+    - **只走免登录**。这个客户端不接受任何凭据，也不发送任何凭据。
+    - 只允许调用一组固定的免登录工具，名单见 ANONYMOUS_TOOLS。
+    - 需要登录的动作一律不在本地做，引导用户到网页完成。
 
-    from haola_checkup import HaolaMCP
-
-    mcp = HaolaMCP()
-    plans = mcp.call("plan_quotation", {
-        "quotes": [{"tier": "员工档", "budget": 800,
-                    "healthConcerns": "久坐、三高"}]
-    })
-
-设计取舍：
-    - 只用标准库（urllib / json），pip install 之后没有任何额外依赖
-    - 需要登录的工具用 bearer token 透传；OAuth 授权交给用户的 MCP 客户端，
-      或在环境变量 HAOLA_TOKEN 里放一个现成 token
+这三个约束是硬的，不是写在文档里的建议。
 """
 
 from __future__ import annotations
 
 import json
-import os
 import urllib.error
 import urllib.request
 
-__all__ = ["HaolaMCP", "MCPError", "AuthRequired", "DEFAULT_URL", "PROTOCOL_VERSION"]
+__all__ = [
+    "HaolaMCP",
+    "MCPError",
+    "LoginRequired",
+    "ANONYMOUS_TOOLS",
+    "DEFAULT_URL",
+    "PROTOCOL_VERSION",
+]
 
 DEFAULT_URL = "https://ai.ihaola.com.cn/api/mcp/haola-pe"
 PROTOCOL_VERSION = "2025-06-18"
+
+#: 客户端被允许调用的工具白名单。只有这些，多一个都不行。
+ANONYMOUS_TOOLS = frozenset(
+    {
+        "plan_quotation",
+        "vendor_brands",
+        "vendor_list",
+        "knowledge_get",
+        "faq",
+        "corp_inquiry",
+        "corp_contact",
+        "help",
+        "progress_report",
+    }
+)
 
 
 class MCPError(RuntimeError):
@@ -52,32 +65,25 @@ class MCPError(RuntimeError):
         return f"{head}: {self.message}" if head else self.message
 
 
-class AuthRequired(MCPError):
-    """需要登录令牌。附带服务端给出的授权地址，便于引导用户。"""
-
-    def __init__(self, message: str, resource_metadata: str | None = None, **kw):
-        super().__init__(message, **kw)
-        self.resource_metadata = resource_metadata
+class LoginRequired(MCPError):
+    """该动作要在网页上登录后完成，客户端不参与。"""
 
 
 class HaolaMCP:
-    """好啦体检 MCP 的最小客户端。
+    """好啦体检 MCP 的最小客户端（仅免登录工具）。
 
-    :param url:   MCP 端点，默认 https://ai.ihaola.com.cn/api/mcp/haola-pe
-    :param token: 用户令牌；优先级 参数 > 环境变量 HAOLA_TOKEN > 无（匿名）
+    :param url:     MCP 端点，默认 https://ai.ihaola.com.cn/api/mcp/haola-pe
     :param timeout: 单次请求超时秒数
     """
 
     def __init__(
         self,
         url: str = DEFAULT_URL,
-        token: str | None = None,
         timeout: int = 60,
         client_name: str = "haola-checkup-skill",
-        client_version: str = "0.1.0",
+        client_version: str = "1.0.2",
     ) -> None:
         self.url = url
-        self.token = token or os.environ.get("HAOLA_TOKEN") or None
         self.timeout = timeout
         self.client_name = client_name
         self.client_version = client_version
@@ -96,8 +102,6 @@ class HaolaMCP:
         }
         if self.session_id:
             h["mcp-session-id"] = self.session_id
-        if self.token:
-            h["Authorization"] = f"Bearer {self.token}"
         return h
 
     def _post(self, payload: dict) -> dict | None:
@@ -113,27 +117,10 @@ class HaolaMCP:
                 return self._parse(raw)
         except urllib.error.HTTPError as e:
             raw = e.read().decode("utf-8", "replace")
-            www = e.headers.get("WWW-Authenticate") if e.headers else None
             msg = self._extract_error_message(raw) or e.reason or "request failed"
             if e.code == 401:
-                raise AuthRequired(
-                    f"该工具需要登录令牌。{msg}",
-                    resource_metadata=self._resource_metadata(www),
-                    status=401,
-                ) from None
+                raise LoginRequired("该动作需要在网页上登录后完成，本客户端不处理。", status=401) from None
             raise MCPError(msg, status=e.code) from None
-
-    @staticmethod
-    def _resource_metadata(www_authenticate: str | None) -> str | None:
-        if not www_authenticate:
-            return None
-        marker = 'resource_metadata="'
-        i = www_authenticate.find(marker)
-        if i < 0:
-            return None
-        start = i + len(marker)
-        end = www_authenticate.find('"', start)
-        return www_authenticate[start:end] if end > start else None
 
     @staticmethod
     def _extract_error_message(raw: str) -> str | None:
@@ -203,7 +190,6 @@ class HaolaMCP:
         try:
             self._post(payload)
         except MCPError:
-            # 通知是一等公民之外的礼貌动作，失败不该中断主流程
             pass
 
     # ---------------------------------------------------------------- 公开接口
@@ -227,11 +213,18 @@ class HaolaMCP:
             self.initialize()
 
     def tools_list(self) -> list[dict]:
+        """列出工具。只保留白名单内的，白名单外的一律不呈现。"""
         self.ensure_ready()
-        return self._rpc("tools/list", {}).get("tools", [])
+        tools = self._rpc("tools/list", {}).get("tools", [])
+        return [t for t in tools if t.get("name") in ANONYMOUS_TOOLS]
 
     def call(self, name: str, arguments: dict | None = None) -> dict:
-        """调用一个工具，返回工具自己输出的 JSON（已解开 MCP 的 content 包装）。"""
+        """调用一个免登录工具，返回工具自己输出的 JSON（已解开 MCP 的 content 包装）。"""
+        if name not in ANONYMOUS_TOOLS:
+            raise MCPError(
+                f"`{name}` 不在本客户端允许调用的范围内。这个动作需要在网页上登录后完成。",
+                code="not_allowed",
+            )
         self.ensure_ready()
         result = self._rpc("tools/call", {"name": name, "arguments": arguments or {}})
 
@@ -261,27 +254,13 @@ class HaolaMCP:
 
         return payload if payload is not None else {"raw": text}
 
-    # 便捷方法：最容易用到的两条路径
-
     def quote(self, budget: int, concerns: str, populations=("man", "lady", "girl"), tier: str = "员工档") -> dict:
-        """企业团检报价（匿名可用）。"""
+        """企业团检报价（免登录）。"""
         return self.call(
             "plan_quotation",
             {"quotes": [{"tier": tier, "budget": budget,
                          "healthConcerns": concerns, "populations": list(populations)}]},
         )
-
-    def recommend(self, gender: str, age: int | None = None, budget: int | None = None,
-                  complaint: str | None = None) -> dict:
-        """个人定制方案（需要登录令牌）。"""
-        args: dict = {"gender": gender}
-        if age is not None:
-            args["age"] = age
-        if budget is not None:
-            args["budget"] = budget
-        if complaint:
-            args["mainComplaint"] = complaint
-        return self.call("plan_recommend", args)
 
     def __enter__(self) -> "HaolaMCP":
         self.ensure_ready()

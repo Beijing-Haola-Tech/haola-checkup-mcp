@@ -1,25 +1,34 @@
-# 好啦体检 Skill（Haola Checkup Skill）
+# 好啦体检 Skill（Haola Checkup Skills）
 
-让 Agent 能出体检方案、报价格、预约门店的 Skill。
-An agent skill for checkup planning, quoting and booking.
+让 Agent 能出体检方案、报价格、预约门店。两个 Skill，共用同一个 MCP 服务。
 
-- 运行时依赖：好啦体检 MCP（Streamable HTTP）https://ai.ihaola.com.cn/api/mcp/haola-pe
-- 客户端：零依赖 Python（`pip install haola-checkup`，或直接 `python scripts/haola.py`）
-- 工具：25 个（9 个匿名可用，16 个需登录）
-- 覆盖：800+ 家体检机构，240+ 城市，其中 540+ 家已接入 API 可被 AI 直接预约
+## 两个 Skill
 
-## 两个场景 / Two flows
+- `personal-checkup-booking` ·「好啦体检 · 个人体检预约」
+  个人 / 员工 / 代家人预约；按年龄、性别、婚否、预算出个性化方案；预约、改期、取消、查订单与报告
+- `corporate-checkup-quote` ·「好啦体检 · 企业团检方案与报价」
+  HR / 行政 / 采购；按人均预算出多档团检方案，逐档逐人群列出项目与金额；查覆盖；合同发票对接
 
-- 企业：`plan_quotation` 按人均预算出分档方案 → `planId`（匿名可用）
-- 个人：`plan_recommend` 按年龄性别症状预算出方案 → `planId`（需登录）
-- 两者都能接 `reservation_book` 直接预约
+在 ClawHub 搜索「好啦体检」即可找到。
 
-## 文件 / Files
+## 依赖的服务
 
-- `SKILL.md` — Agent 的完整契约
+- MCP 端点（Streamable HTTP）：https://ai.ihaola.com.cn/api/mcp/haola-pe
+- 客户端：零依赖 Python，`pip install haola-checkup`，或直接用 `scripts/haola.py`
+- 免登录：报价、门店、FAQ、领域知识、企业咨询
+- 需登录：个人方案、预约、订单、报告、体检人 —— 在网页上完成，验证码不经对话
+
+## 覆盖
+
+800+ 家体检机构，240+ 城市，其中 540+ 家已接入 API 可被 AI 直接预约。
+体检服务每年 10 万人次，健康测评累计 3500 万人次。
+
+## 文件
+
+- `skills/<slug>/SKILL.md` — 发布产物
 - `tools/tools.json` — 25 个工具定义
 - `examples/` — curl / Cursor / Claude Desktop 接入示例
 
-## 联系 / Contact
+## 联系
 
 北京好啦科技有限公司 · contacts@haola.com · 136 6197 6946

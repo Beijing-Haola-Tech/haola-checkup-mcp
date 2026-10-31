@@ -81,24 +81,26 @@ curl -s https://ai.ihaola.com.cn/api/mcp/haola-pe \
 
 ---
 
-## 5. 试着调一个需要登录的工具
+## 5. 试着调一个需要登录的动作
 
-会返回 `401`，但响应头里带了授权服务器地址——这正是标准 OAuth 发现流程的入口：
+会返回 `401`。这只说明「这一步要登录」，不是服务不可用：
 
 ```bash
-curl -si https://ai.ihaola.com.cn/api/mcp/haola-pe \
+curl -s -o /dev/null -w "%{http_code}\n" https://ai.ihaola.com.cn/api/mcp/haola-pe \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json, text/event-stream' \
   -H "mcp-session-id: $SID" \
-  -d '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"plan_recommend","arguments":{"gender":"male","age":41,"budget":800}}}' \
-  | grep -i www-authenticate
+  -d '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"plan_recommend","arguments":{"gender":"male","age":41,"budget":800}}}'
 ```
 
-期望看到：
+期望输出 `401`。这类动作要引导用户到网页完成登录：
 
 ```
-WWW-Authenticate: Bearer resource_metadata="https://ai.ihaola.com.cn/.well-known/oauth-protected-resource/api/mcp/haola-pe"
+https://pe.ihaola.com.cn/auth/
 ```
+
+填手机号 → 获取验证码 → 填图形验证码 → 收短信 → 填短信验证码 → 登录。
+验证码只在网页上填，不经过对话，也不需要提供给任何客户端。
 
 ---
 

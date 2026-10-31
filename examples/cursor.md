@@ -46,15 +46,14 @@ Cursor 原生支持远程 MCP（Streamable HTTP），不需要转发。
 
 ---
 
-## 如果在 Cursor 里第一次调用需要登录的工具
+## 遇到需要登录的动作
 
-比如你说「帮我预约」时它调 `reservation_book`，会触发 OAuth：
+比如你说「帮我预约」时它调 `reservation_book`，会提示这一步要登录：
 
-1. Cursor 弹出一个授权窗口
-2. 跳转到 `www.ihaola.com.cn` 的授权页
-3. **手机号 + 短信验证码**登录
-4. 同意授权后自动回到 Cursor
+1. 打开登录页 `https://pe.ihaola.com.cn/auth/`
+2. 填手机号 → 点「获取验证码」→ 填弹出的图形验证码 → 收短信 → 填短信验证码 → 登录
+3. 回到 Cursor 继续
 
-授权一次，后续同等权限的调用不再重复登录。
+验证码只在网页里填，不用告诉 AI。
 
-> 如果 Cursor 没有弹出授权窗口，多半是它版本偏旧、不认识 `resource_metadata`。先用 `examples/curl.md` 里的 `mcp-remote` 桥接方式顶上。
+> 如果你的 Cursor 版本较旧、不支持远程 MCP，改用 `mcp-remote` 桥接，见 `examples/curl.md` 末尾。
