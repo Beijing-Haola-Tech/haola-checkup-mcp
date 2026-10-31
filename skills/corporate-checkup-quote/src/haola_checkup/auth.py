@@ -33,6 +33,9 @@ import urllib.request
 ISSUER = "https://ai.ihaola.com.cn"
 RESOURCE = "https://ai.ihaola.com.cn/api/mcp/haola-pe"
 SCOPE = "haola-pe"
+# 动态注册时上报的客户端名。授权页「申请接入方」显示的就是它。
+# 构建时按 skill 覆写（见 build.mjs），不要在运行时改。
+CLIENT_NAME = "好啦体检 · 企业团检报价"
 TOKEN_DIR = os.path.join(os.path.expanduser("~"), ".haola")
 TOKEN_PATH = os.path.join(TOKEN_DIR, "token.json")
 
@@ -178,7 +181,7 @@ def login(timeout: int = 300, open_browser: bool = True, quiet: bool = False) ->
     redirect_uri = f"http://127.0.0.1:{port}/callback"
 
     st, reg = _post_json(ISSUER + "/api/auth/oauth/register", {
-        "client_name": "haola-checkup-skill",
+        "client_name": CLIENT_NAME,
         "redirect_uris": [redirect_uri],
         "grant_types": ["authorization_code", "refresh_token"],
         "response_types": ["code"],
