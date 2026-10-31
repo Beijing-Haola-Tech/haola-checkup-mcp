@@ -42,18 +42,24 @@ def cmd_ping(args) -> int:
         print(f"  session      {mcp.session_id}")
         print(f"  server       {server.get('name', '?')} {server.get('version', '')}".rstrip())
         print(f"  protocol     {info.get('protocolVersion', '?')}")
-        print(f"  模式         仅免登录工具（{len(ANONYMOUS_TOOLS)} 个）")
+        from . import auth as _auth
+        if _auth.access_token():
+            print("  模式         已登录（白名单已放开，全部工具可调）")
+        else:
+            print(f"  模式         未登录，仅免登录工具（{len(ANONYMOUS_TOOLS)} 个）")
     return 0
 
 
 def cmd_tools(args) -> int:
+    from . import auth as _auth
+
     with HaolaMCP(url=args.url) as mcp:
         tools = mcp.tools_list()
-    print(f"可调用 {len(tools)} 个免登录工具\n")
+    logged = bool(_auth.access_token())
+    print(f"可调用 {len(tools)} 个工具" + ("" if logged else "（未登录，只剩免登录工具）") + "\n")
     for t in tools:
         print(f"  {t['name']:<24}{_first_line(t.get('description', ''))}")
-    from . import auth as _auth
-    if _auth.access_token():
+    if logged:
         print("\n已登录：个人方案、预约、订单、报告都可以直接调用。")
     else:
         print("\n需要登录的动作（个人方案 / 预约 / 订单 / 报告）：先跑 python scripts/haola.py login")
@@ -108,8 +114,14 @@ def cmd_login(args) -> int:
     print("登录成功，凭据已存到 " + auth.TOKEN_PATH)
     exp = tok.get("expires_at")
     if exp:
-        mins = max(1, int((exp - time.time()) // 60))
-        print("  有效期约 %d 分钟，过期后重新跑一次 login 即可" % mins)
+        left = max(0, int(exp - time.time()))
+        if left >= 86400:
+            span = "%d 天" % (left // 86400)
+        elif left >= 3600:
+            span = "%d 小时" % (left // 3600)
+        else:
+            span = "%d 分钟" % max(1, left // 60)
+        print("  有效期约 %s，过期后重新跑一次 login 即可" % span)
     return 0
 
 
