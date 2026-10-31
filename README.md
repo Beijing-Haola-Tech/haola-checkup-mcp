@@ -168,4 +168,6 @@ twine upload dist/*
 
 [MIT](LICENSE) — 覆盖本仓库的客户端代码、文档与示例。托管服务本身由北京好啦科技有限公司依单独的服务条款运营。
 
+> **关于 ClawHub 上的 License 显示**：ClawHub 的 Skill 条目统一显示 `MIT-0`，这是平台对 Skill 列表的固定展示，不读取 `SKILL.md` frontmatter 里的 `license` 字段（`clawhub publish` 也没有对应参数）。`MIT-0` 比 MIT 更宽松——不要求署名，不影响任何人使用。本仓库的代码仍是 MIT。
+
 北京好啦科技有限公司 · Haola Tech · contacts@haola.com
