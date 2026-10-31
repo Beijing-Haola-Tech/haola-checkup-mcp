@@ -203,7 +203,10 @@ def login(timeout: int = 300, open_browser: bool = True, quiet: bool = False) ->
 
     _CallbackHandler.result = {}
     srv = http.server.HTTPServer(("127.0.0.1", port), _CallbackHandler)
-    th = threading.Thread(target=srv.handle_request, daemon=True)
+    # 必须持续监听：浏览器常会先请求 /favicon.ico，只处理一次会被它消耗掉，
+    # 真正的 /callback 就会 connection refused。
+    srv.timeout = 1
+    th = threading.Thread(target=srv.serve_forever, daemon=True)
     th.start()
 
     if not quiet:
@@ -212,7 +215,10 @@ def login(timeout: int = 300, open_browser: bool = True, quiet: bool = False) ->
     if open_browser:
         _open_small_window(auth_url)
 
-    th.join(timeout=timeout)
+    deadline = time.time() + timeout
+    while time.time() < deadline and not _CallbackHandler.result.get("code"):
+        time.sleep(0.2)
+    srv.shutdown()
     srv.server_close()
     got = _CallbackHandler.result
     if not got.get("code"):
