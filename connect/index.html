@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>好啦体检 · 接入导引</title>
+<meta name="description" content="两步接入好啦体检 MCP 服务：装 Skill、接 MCP。Cursor / VS Code / Claude Code / WorkBuddy 各客户端的安装方式。">
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#fff; --ink:#16181d; --muted:#5f6672;
+    --line:#e3e6ea; --brand:#0b6b5f; --brand-soft:#e6f2f0; --warn:#8a5a00; --warn-soft:#fff5e0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;}
+  .wrap{max-width:860px;margin:0 auto;padding:40px 20px 72px}
+  header{margin-bottom:32px}
+  h1{font-size:28px;line-height:1.3;margin:0 0 8px;letter-spacing:-.01em}
+  .sub{color:var(--muted);margin:0}
+  h2{font-size:19px;margin:44px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--line)}
+  h2 .idx{display:inline-block;width:24px;height:24px;border-radius:50%;background:var(--brand);
+    color:#fff;font-size:14px;text-align:center;line-height:24px;margin-right:8px;vertical-align:1px}
+  .grid{display:grid;gap:14px;grid-template-columns:1fr 1fr}
+  @media(max-width:660px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px}
+  .card h3{margin:0 0 4px;font-size:16px;display:flex;align-items:center;gap:8px}
+  .card p{margin:0 0 12px;color:var(--muted);font-size:14px}
+  .tag{font-size:11px;font-weight:600;padding:2px 7px;border-radius:99px;letter-spacing:.02em}
+  .tag.one{background:var(--brand-soft);color:var(--brand)}
+  .tag.manual{background:var(--warn-soft);color:var(--warn)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;
+    background:var(--brand);color:#fff;text-decoration:none;font-weight:600;font-size:14px;
+    padding:9px 16px;border-radius:8px;border:0;cursor:pointer;transition:.15s}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.ghost{background:#fff;color:var(--brand);border:1px solid var(--brand)}
+  pre{margin:0;background:#12151a;color:#e6e9ee;border-radius:9px;padding:13px 14px;
+    overflow-x:auto;font:13px/1.6 ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace}
+  .code{position:relative;margin-bottom:10px}
+  .code .btn{position:absolute;top:8px;right:8px;padding:4px 10px;font-size:12px;
+    background:#2b313b;color:#cfd6e0}
+  .code .btn:hover{background:#3a424f}
+  .note{background:var(--warn-soft);border-left:3px solid #e0a300;padding:12px 14px;
+    border-radius:0 8px 8px 0;font-size:14px;margin:16px 0}
+  .note b{color:var(--warn)}
+  table{width:100%;border-collapse:collapse;font-size:14px;background:var(--card);
+    border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line)}
+  tr:last-child td{border-bottom:0}
+  th{background:#fafbfc;font-weight:600;color:var(--muted);font-size:13px}
+  code.inl{background:#eef1f3;padding:1px 5px;border-radius:4px;
+    font:13px ui-monospace,SFMono-Regular,Consolas,monospace}
+  footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--line);
+    color:var(--muted);font-size:13px}
+  footer a{color:var(--brand)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>好啦体检 · 接入导引</h1>
+  <p class="sub">两步：把 MCP 服务接给你的 AI 客户端，再把 Skill 装上。全程不需要改代码。</p>
+</header>
+
+<h2><span class="idx">1</span>接 MCP 服务</h2>
+<p style="color:var(--muted);margin-top:-4px">服务地址（只有一个，两个 Skill 共用）：</p>
+<div class="code">
+  <pre id="endpoint">https://ai.ihaola.com.cn/api/mcp/haola-pe</pre>
+  <button class="btn" data-copy="endpoint">复制</button>
+</div>
+
+<div class="grid" style="margin-top:18px">
+
+  <div class="card">
+    <h3>Cursor <span class="tag one">一键</span></h3>
+    <p>点下面按钮，Cursor 会弹窗让你确认添加。</p>
+    <a class="btn" href="cursor://anysphere.cursor-deeplink/mcp/install?name=haola-pe&amp;config=eyJ1cmwiOiJodHRwczovL2FpLmloYW9sYS5jb20uY24vYXBpL21jcC9oYW9sYS1wZSJ9">在 Cursor 中添加</a>
+  </div>
+
+  <div class="card">
+    <h3>VS Code <span class="tag one">一键</span></h3>
+    <p>需要 VS Code 1.102 或更新版本。</p>
+    <a class="btn" href="vscode:mcp/install?%7B%22name%22%3A%22haola-pe%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fai.ihaola.com.cn%2Fapi%2Fmcp%2Fhaola-pe%22%7D">在 VS Code 中安装</a>
+  </div>
+
+  <div class="card">
+    <h3>Claude Code <span class="tag one">一行命令</span></h3>
+    <p>在终端里执行，然后新开一个会话。</p>
+    <div class="code">
+      <pre id="cc">claude mcp add --transport http haola-pe https://ai.ihaola.com.cn/api/mcp/haola-pe</pre>
+      <button class="btn" data-copy="cc">复制</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>WorkBuddy <span class="tag manual">需手动</span></h3>
+    <p>编辑 <code class="inl">%USERPROFILE%\.workbuddy\mcp.json</code>，保存后在「连接器管理」里点一次<b>信任</b>，再新开会话。</p>
+    <div class="code">
+      <pre id="wb">{
+  "mcpServers": {
+    "haola-pe": {
+      "type": "streamableHttp",
+      "url": "https://ai.ihaola.com.cn/api/mcp/haola-pe",
+      "timeout": 60000,
+      "disabled": false
+    }
+  }
+}</pre>
+      <button class="btn" data-copy="wb">复制</button>
+    </div>
+  </div>
+
+</div>
+
+<div class="card" style="margin-top:14px">
+  <h3>其他客户端</h3>
+  <p>任何支持远程 MCP（Streamable HTTP）的客户端，把本节开头那个地址填进去即可。手写配置时用这段：</p>
+  <div class="code">
+    <pre id="raw">{
+  "mcpServers": {
+    "haola-pe": {
+      "type": "http",
+      "url": "https://ai.ihaola.com.cn/api/mcp/haola-pe"
+    }
+  }
+}</pre>
+    <button class="btn" data-copy="raw">复制</button>
+  </div>
+</div>
+
+<h2><span class="idx">2</span>装 Skill（给 AI 读的说明书）</h2>
+<p style="color:var(--muted);margin-top:-4px">装完 Skill，AI 才知道什么时候调哪个工具、按什么顺序出方案。两个场景各装一个，按需选。</p>
+
+<table style="margin-bottom:16px">
+  <tr><th>场景</th><th>Slug</th></tr>
+  <tr><td>个人体检、方案推荐、预约、订单、报告</td><td><code class="inl">personal-checkup-booking</code></td></tr>
+  <tr><td>企业团检、人均预算分档报价、合同发票</td><td><code class="inl">corporate-checkup-quote</code></td></tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h3>个人版</h3>
+    <div class="code">
+      <pre id="i1">clawhub install personal-checkup-booking</pre>
+      <button class="btn" data-copy="i1">复制</button>
+    </div>
+  </div>
+  <div class="card">
+    <h3>企业版</h3>
+    <div class="code">
+      <pre id="i2">clawhub install corporate-checkup-quote</pre>
+      <button class="btn" data-copy="i2">复制</button>
+    </div>
+  </div>
+</div>
+
+<div class="note">
+  <b>注意：不要用 <code class="inl">@ryanbihai/personal-checkup-booking</code> 这种写法。</b>
+  ClawHub 详情页上给出的安装命令带了 <code class="inl">@作者/</code> 前缀，但 <code class="inl">clawhub</code> 和
+  <code class="inl">openclaw</code> 两个 CLI 都不接受，会直接报 <code class="inl">Invalid skill slug</code>。
+  <b>只写 slug 本身</b>即可。
+</div>
+
+<div class="card" style="margin-top:14px">
+  <h3>WorkBuddy 用户</h3>
+  <p>WorkBuddy 读的是自己的技能目录，安装时指定 <code class="inl">--workdir</code> 就能直接装对位置，不用手动拷贝：</p>
+  <div class="code">
+    <pre id="i3">clawhub --workdir "$env:USERPROFILE\.workbuddy" install personal-checkup-booking --force</pre>
+    <button class="btn" data-copy="i3">复制</button>
+  </div>
+</div>
+
+<h2><span class="idx">3</span>装完之后</h2>
+<table>
+  <tr><th>能力</th><th>要登录吗</th><th>怎么发生</th></tr>
+  <tr><td>查门店、查品牌覆盖、体检 FAQ、领域知识</td><td>不要</td><td>直接问，AI 直接调</td></tr>
+  <tr><td>个人体检方案推荐、预约、改期、取消、订单、报告</td><td>要</td><td>客户端弹出授权，点一次即可，之后 AI 接着算</td></tr>
+  <tr><td>企业团检方案与报价</td><td>不要</td><td>直接问，按人均预算出多档</td></tr>
+</table>
+
+<div class="note" style="margin-top:16px">
+  <b>我们不会向你要验证码、密码或银行卡信息。</b>
+  登录只发生在客户端弹出的授权页面里。如果授权页显示「resource 无效」，说明这次没带授权上下文，
+  让 AI 重新发起一次即可，不用重填手机号。
+</div>
+
+<footer>
+  好啦体检（haola-pe）· 服务地址 <code class="inl">https://ai.ihaola.com.cn/api/mcp/haola-pe</code><br>
+  Skill 源码与说明：<a href="https://github.com/ryanbihai/haola-checkup-mcp">github.com/ryanbihai/haola-checkup-mcp</a>
+</footer>
+
+</div>
+<script>
+document.querySelectorAll('[data-copy]').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var el = document.getElementById(btn.getAttribute('data-copy'));
+    var text = el.textContent;
+    var done = function(){
+      var old = btn.textContent;
+      btn.textContent = '已复制';
+      setTimeout(function(){ btn.textContent = old; }, 1400);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function(){ fallback(text, done); });
+    } else { fallback(text, done); }
+  });
+});
+function fallback(text, cb){
+  var ta = document.createElement('textarea');
+  ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); cb(); }catch(e){}
+  document.body.removeChild(ta);
+}
+</script>
+</body>
+</html>

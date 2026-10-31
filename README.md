@@ -37,6 +37,51 @@
 
 ---
 
+## 安装（客户看这一节）
+
+### ① 一条命令装 Skill
+
+```bash
+clawhub install personal-checkup-booking      # 个人体检
+clawhub install corporate-checkup-quote        # 企业团检
+```
+
+> **只写 slug，不要写 `@作者/slug`。**
+> ClawHub 详情页会生成形如 `openclaw skills install @ryanbihai/personal-checkup-booking` 的命令，
+> 但 `clawhub` 和 `openclaw` 两个 CLI 实测都直接报 `Invalid skill slug`——slug 只允许小写字母、数字、连字符，
+> 不能带 `@` 和 `/`。这是 ClawHub 页面自身的显示问题，不是 Skill 的问题。
+
+WorkBuddy 用户注意落盘位置——`clawhub install` 装到 `<workdir>/skills/<slug>`，
+而 WorkBuddy 只读 `~/.workbuddy/skills`，所以指定 workdir，不要手动拷目录：
+
+```powershell
+clawhub --workdir "$env:USERPROFILE\.workbuddy" install personal-checkup-booking --force
+```
+
+### ② 一键接 MCP
+
+`connect/index.html` 是可直接部署的静态接入页，无外部依赖：
+
+| 客户端 | 方式 |
+|---|---|
+| **Cursor** | `cursor://anysphere.cursor-deeplink/mcp/install?…`，点一下自动写入 |
+| **VS Code**（1.102+） | `vscode:mcp/install?…`，点一下自动写入 |
+| **Claude Code** | `claude mcp add --transport http haola-pe <url>` |
+| **WorkBuddy** | 手写 `~/.workbuddy/mcp.json` + 连接器管理里点一次「信任」（官方未开放深链）|
+| 其他客户端 | 填服务地址即可，见下方「怎么接」 |
+
+部署：把 `connect/` 目录传到站点根目录（如 `https://pe.ihaola.com.cn/connect/`）即可。
+
+两条深链的编码规则不同，改地址时两个都要重算：
+
+| | Cursor | VS Code |
+|---|---|---|
+| 参数形态 | `?name=…&config=<base64>` | `vscode:mcp/install?<URL 编码的 JSON>` |
+| `name` 位置 | 在 query 里 | 在 JSON 内部 |
+| `type` 字段 | 不需要 | `"type": "http"` |
+
+---
+
 ## 怎么接
 
 两个 Skill 共用同一个 MCP 服务：
