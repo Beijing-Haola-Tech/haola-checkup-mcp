@@ -43,6 +43,29 @@ python scripts/haola.py call vendor_brands '{}'
 
 企业链路全程免登录，既不需要、也不应该运行登录命令。
 
+### 没有 Python 的电脑（Windows）
+
+同一目录下还有一份等价的 PowerShell 实现，用系统自带的 PowerShell 5.1 就能跑，
+不需要安装任何东西。命令一一对应：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\haola.ps1 ping
+powershell -ExecutionPolicy Bypass -File scripts\haola.ps1 tools
+powershell -ExecutionPolicy Bypass -File scripts\haola.ps1 call vendor_brands '{}'
+```
+
+**先探测运行时，再决定用哪条**：
+
+```
+python --version      # 或 py -3 --version
+```
+
+- 有输出 → 用 `python scripts/haola.py ...`
+- 报错或没有这个命令，且系统是 Windows → 用 `powershell -ExecutionPolicy Bypass -File scripts\haola.ps1 ...`
+- 两者都没有 → 按「连不上时」第 3 步如实说明，不要凭常识编造方案
+
+两份实现共用同一个凭据文件（`~/.haola/token.json`），先登录一次，之后换哪种都能用。
+
 ### 连不上时：先让用户说一句话，别直接说"不支持"
 
 大多数"连不上"并不是环境不行，而是客户端里还没加这个服务。按下面三步走，**不要一上来就给用户贴 JSON 让他去改配置文件**。
@@ -134,7 +157,7 @@ python scripts/haola.py call vendor_brands '{}'
 |---|---|---|
 | 网络（出站） | 调 `haola-pe` 服务 | 只连 `https://ai.ihaola.com.cn`，不连任何其他域名 |
 | 凭据去向 | 登录后的请求 | **只发给 `https://ai.ihaola.com.cn`**；把 `--url` 指向别的地址时不会附带凭据 |
-| 执行命令（shell） | 跑 `python scripts/haola.py` | 只执行本 skill 自带的脚本；登录时用 `--app` 模式拉起 Edge/Chrome 小窗 |
+| 执行命令（shell） | 跑 `python scripts/haola.py` 或 `powershell -File scripts/haola.ps1` | 只执行本 skill 自带的两个脚本；登录时用 `--app` 模式拉起 Edge/Chrome 小窗 |
 | 写本地文件 | 存登录凭据（仅个人版） | 只写 `~/.haola/token.json`，不写别处 |
 | 读本地文件 | 读登录凭据（仅个人版） | 只读上面那个文件 |
 
