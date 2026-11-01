@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 
 __all__ = [
@@ -93,9 +94,38 @@ ALLOWED_TOOLS = frozenset(
 )
 
 
+def _same_origin(a: str, b: str) -> bool:
+    ua, ub = urllib.parse.urlsplit(a), urllib.parse.urlsplit(b)
+    return (ua.scheme, ua.netloc) == (ub.scheme, ub.netloc)
+
+
+class _SafeRedirect(urllib.request.HTTPRedirectHandler):
+    """只跟随同源、且仍是 https 的跳转。
+
+    urllib 默认会把请求头（含 Authorization）原样带到重定向目标。若服务端
+    把请求导向别的域名、或降级到 http，本机保存的凭据就跟着走了 ——
+    只在发请求前校验 origin 是不够的，必须连跳转一起管住。
+
+    这里拒绝跨源与降级跳转：返回 None 后 urllib 会把重定向变成 HTTPError，
+    由调用方按普通失败处理，不会把凭据发出去。
+    """
+
+    max_redirections = 5
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: N802
+        if urllib.parse.urlsplit(newurl).scheme != "https":
+            return None
+        if not _same_origin(req.full_url, newurl):
+            return None
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+#: 全局共用：所有请求都走这个 opener，保证跳转策略一致
+_OPENER = urllib.request.build_opener(_SafeRedirect)
+
+
 class MCPError(RuntimeError):
     """JSON-RPC 层或传输层返回的错误。"""
-
     def __init__(self, message: str, code: int | None = None, data=None, status: int | None = None):
         super().__init__(message)
         self.message = message
@@ -173,7 +203,7 @@ class HaolaMCP:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         req = urllib.request.Request(self.url, data=body, headers=self._headers(), method="POST")
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            with _OPENER.open(req, timeout=self.timeout) as resp:
                 sid = resp.headers.get("mcp-session-id")
                 if sid:
                     self.session_id = sid

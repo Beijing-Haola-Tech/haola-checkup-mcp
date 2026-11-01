@@ -42,12 +42,35 @@ TOKEN_PATH = os.path.join(TOKEN_DIR, "token.json")
 __all__ = ["login", "load_token", "logout", "TOKEN_PATH"]
 
 
+class _SafeRedirect(urllib.request.HTTPRedirectHandler):
+    """只跟随同源、且仍是 https 的跳转。
+
+    换 token 的 POST 体里有授权码和 PKCE verifier。urllib 默认会跟随重定向，
+    307/308 还会把请求体一起带过去；若被导向别的域名或降级到 http，
+    这些值就泄露了。这里一律拒绝跨源与非 https 跳转。
+    """
+
+    max_redirections = 5
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: N802
+        if urllib.parse.urlsplit(newurl).scheme != "https":
+            return None
+        old = urllib.parse.urlsplit(req.full_url)
+        new = urllib.parse.urlsplit(newurl)
+        if (old.scheme, old.netloc) != (new.scheme, new.netloc):
+            return None
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_OPENER = urllib.request.build_opener(_SafeRedirect)
+
+
 def _post_json(url: str, payload: dict, timeout: int = 30) -> tuple[int, dict]:
     data = json.dumps(payload).encode()
     req = urllib.request.Request(url, data=data, method="POST")
     req.add_header("Content-Type", "application/json")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with _OPENER.open(req, timeout=timeout) as r:
             return r.status, json.loads(r.read().decode() or "{}")
     except urllib.error.HTTPError as e:
         raw = e.read().decode("utf-8", "replace")
@@ -62,7 +85,7 @@ def _post_form(url: str, payload: dict, timeout: int = 30) -> tuple[int, dict]:
     req = urllib.request.Request(url, data=data, method="POST")
     req.add_header("Content-Type", "application/x-www-form-urlencoded")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with _OPENER.open(req, timeout=timeout) as r:
             return r.status, json.loads(r.read().decode() or "{}")
     except urllib.error.HTTPError as e:
         raw = e.read().decode("utf-8", "replace")
