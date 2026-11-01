@@ -12,10 +12,10 @@ import json
 import sys
 
 from .client import (
+    ALLOWED_TOOLS,
     ANONYMOUS_TOOLS,
     DEFAULT_URL,
     ENABLE_CORPORATE_QUOTE,
-    RELAX_ALLOWLIST_WHEN_LOGGED_IN,
     USE_LOCAL_TOKEN,
     HaolaMCP,
     LoginRequired,
@@ -55,34 +55,38 @@ def cmd_ping(args) -> int:
         print(f"  session      {mcp.session_id}")
         print(f"  server       {server.get('name', '?')} {server.get('version', '')}".rstrip())
         print(f"  protocol     {info.get('protocolVersion', '?')}")
-        if HaolaMCP._allows_all():
-            print("  模式         已登录（白名单已放开，全部工具可调）")
+        if not USE_LOCAL_TOKEN:
+            print(f"  模式         全程免登录（可调 {len(ALLOWED_TOOLS)} 个企业工具）")
+        elif HaolaMCP._logged_in():
+            print(f"  模式         已登录（本 skill 上限 {len(ALLOWED_TOOLS)} 个工具）")
         else:
-            print(f"  模式         仅白名单内工具（{len(ANONYMOUS_TOOLS)} 个）")
+            print(f"  模式         未登录（可调 {len(ANONYMOUS_TOOLS)} 个免登录工具）")
     return 0
 
 
 def cmd_tools(args) -> int:
     with HaolaMCP(url=args.url) as mcp:
         tools = mcp.tools_list()
-    logged = HaolaMCP._allows_all()
-    print(f"可调用 {len(tools)} 个工具" + ("" if logged else "（仅白名单内）") + "\n")
+    logged = HaolaMCP._logged_in()
+    suffix = "" if (logged or not USE_LOCAL_TOKEN) else "（未登录，需登录的暂不可调）"
+    print(f"当前可调用 {len(tools)} 个工具{suffix}\n")
     for t in tools:
         print(f"  {t['name']:<24}{_first_line(t.get('description', ''))}")
-    if logged:
-        print("\n已登录：个人方案、预约、订单、报告都可以直接调用。")
-    else:
-        print("\n需要登录的动作（个人方案 / 预约 / 订单 / 报告）：先跑 python scripts/haola.py login")
+    if not logged and USE_LOCAL_TOKEN:
+        print("\n需要登录的工具（个人方案 / 预约 / 订单 / 报告）：先跑 python scripts/haola.py login")
     return 0
 
 
 def cmd_call(args) -> int:
-    if args.name not in ANONYMOUS_TOOLS and not HaolaMCP._allows_all():
+    if args.name not in ALLOWED_TOOLS:
         print(f"`{args.name}` 不在本 skill 的调用范围内。", file=sys.stderr)
-        print("可调用的工具：" + "、".join(sorted(ANONYMOUS_TOOLS)), file=sys.stderr)
-        if USE_LOCAL_TOKEN:
-            print("个人体检类工具需先登录：在这个目录下跑 python scripts/haola.py login", file=sys.stderr)
+        print("本 skill 可调用的工具：" + "、".join(sorted(ALLOWED_TOOLS)), file=sys.stderr)
         return 5
+    if args.name not in ANONYMOUS_TOOLS and not HaolaMCP._logged_in():
+        print(f"`{args.name}` 需要先登录。", file=sys.stderr)
+        if USE_LOCAL_TOKEN:
+            print("在这个目录下跑一次：python scripts/haola.py login", file=sys.stderr)
+        return 3
 
     try:
         arguments = json.loads(args.json) if args.json else {}

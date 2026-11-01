@@ -5,6 +5,8 @@ license: MIT
 allowed-tools:
   - Bash
   - Read
+  - Write
+  - WebFetch
 metadata:
   openclaw:
     requires:
@@ -38,7 +40,7 @@ python scripts/haola.py tools
 python scripts/haola.py call vendor_brands '{}'
 ```
 
-**通道 B 也覆盖登录类工具。** 先登录一次，之后全部 25 个工具都能用：
+**通道 B 也覆盖登录类工具。** 先登录一次，之后本 skill 支持的 22 个工具都能用：
 
 ```bash
 python scripts/haola.py login
@@ -216,7 +218,7 @@ python scripts/haola.py login
 
 共 25 个工具。`[免]` = 免登录，`[登]` = 需要登录。
 
-下表覆盖本 skill 登录后可用的全部工具；未登录时只有白名单内 6 个能调。
+下表是全服务的 25 个工具。**本 skill 只调用其中 22 个** —— 不含 `plan_quotation`、`corp_inquiry`、`corp_contact` 这三个企业侧工具，登录后也不会变；未登录时只有白名单内 6 个能调。
 
 | 工具 | 用途 | 登录 |
 |---|---|---|
@@ -319,7 +321,7 @@ cost_summary = { totalSpent, remaining, overBudgetExtra }
 
 ## 工具调用要点
 
-下表覆盖本 skill 登录后可用的全部工具；未登录时只有白名单内 6 个能调。
+下表是全服务的 25 个工具。**本 skill 只调用其中 22 个** —— 不含 `plan_quotation`、`corp_inquiry`、`corp_contact` 这三个企业侧工具，登录后也不会变；未登录时只有白名单内 6 个能调。
 下列约束来自各自的 `inputSchema`，违反会直接报错。
 
 ### help

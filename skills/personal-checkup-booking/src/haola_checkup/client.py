@@ -3,17 +3,15 @@
 只做一件事：把 MCP Streamable HTTP 的握手、会话、SSE 解析包起来，
 让 Skill 的脚本可以直接调用远端工具，不需要客户预先配置 MCP。
 
-能力边界由下面三个模块级开关决定，构建时按 skill 覆写：
+能力边界由下面这些值决定，构建时按 skill 覆写：
 
-    USE_LOCAL_TOKEN                 是否读取本机凭据（~/.haola/token.json）
-    RELAX_ALLOWLIST_WHEN_LOGGED_IN  有凭据时是否放开白名单
-    ENABLE_CORPORATE_QUOTE          是否提供企业团检报价
+    USE_LOCAL_TOKEN         是否读取本机凭据（~/.haola/token.json）并附在请求头
+    ENABLE_CORPORATE_QUOTE  是否提供企业团检报价
+    ANONYMOUS_TOOLS         未登录时可调的工具
+    ALLOWED_TOOLS           本 skill 的能力上限
 
-个人版：三个都 True，登录后可用全部工具。
-企业版：后两个为 False，且不读凭据 —— 本机存着个人 token 也不会扩大企业链路的能力，
-        它永远只能调用企业白名单里的工具。
-
-白名单本身见 ANONYMOUS_TOOLS，也是构建时写入的。
+登录只解锁「需要登录」的那部分工具，**不会让 ALLOWED_TOOLS 变大**。
+企业版不读凭据，ALLOWED_TOOLS 与 ANONYMOUS_TOOLS 相同（9 个），没有扩张路径。
 """
 
 from __future__ import annotations
@@ -27,6 +25,7 @@ __all__ = [
     "MCPError",
     "LoginRequired",
     "ANONYMOUS_TOOLS",
+    "ALLOWED_TOOLS",
     "DEFAULT_URL",
     "PROTOCOL_VERSION",
 ]
@@ -35,25 +34,19 @@ DEFAULT_URL = "https://ai.ihaola.com.cn/api/mcp/haola-pe"
 PROTOCOL_VERSION = "2025-06-18"
 
 # ---------------------------------------------------------------------------
-# 本 skill 的能力边界。三个开关由构建脚本按 skill 覆写（见 build.mjs），
-# 运行时不改：它们是本 skill 对外的承诺，安全审计会逐项核对实现与声明是否一致。
+# 本 skill 的能力边界。下面的值由构建脚本按 skill 覆写（见 build.mjs），
+# 运行时不改：它们是本 skill 对外的承诺，安全审计会逐项核对声明与实现是否一致。
 # ---------------------------------------------------------------------------
 
 #: 是否读取本机凭据（~/.haola/token.json）。
-#: 个人版 True —— 登录一次，之后可用需要登录的工具。
-#: 企业版 False —— 企业链路全程免登录，既不读取也不使用个人凭据。
+#: 个人版 True；企业版 False —— 企业链路既不读凭据，也不往请求里放 Authorization 头。
 USE_LOCAL_TOKEN = True
 
-#: 已有凭据时是否放开 ANONYMOUS_TOOLS 白名单。
-#: 个人版 True —— 登录后全部工具可用。
-#: 企业版 False —— 即使本机存着个人凭据，也仍只放行企业白名单内的工具。
-RELAX_ALLOWLIST_WHEN_LOGGED_IN = True
-
 #: 是否提供企业团检报价（plan_quotation）。
-#: 企业版 True；个人版 False —— 个人场景不做团检报价。
+#: 企业版 True；个人版 False。
 ENABLE_CORPORATE_QUOTE = False
 
-#: 客户端被允许调用的工具白名单，构建时按 skill 覆写。
+#: 未登录时允许调用的工具（构建时按 skill 覆写）。
 ANONYMOUS_TOOLS = frozenset(
     {
         "vendor_list",
@@ -62,6 +55,36 @@ ANONYMOUS_TOOLS = frozenset(
         "faq",
         "help",
         "progress_report",
+    }
+)
+
+#: 本 skill 允许调用的全部工具（构建时按 skill 覆写）。
+#: 这是**上限**，登录只是拿到调用其中「需登录」那部分的资格，
+#: 不存在「登录后白名单被放开」这种路径 —— 审计关心的正是这个区别。
+ALLOWED_TOOLS = frozenset(
+    {
+        "vendor_list",
+        "vendor_brands",
+        "knowledge_get",
+        "faq",
+        "help",
+        "progress_report",
+        "plan_recommend",
+        "order_list",
+        "order_detail",
+        "welfare_list",
+        "welfare_detail",
+        "cautions",
+        "contact_list",
+        "contact_get",
+        "contact_create",
+        "contact_update",
+        "contact_profile_get",
+        "contact_profile_save",
+        "reservation_book",
+        "reservation_cancel",
+        "reservation_modify",
+        "card_list",
     }
 )
 
@@ -123,13 +146,14 @@ class HaolaMCP:
         }
         if self.session_id:
             h["mcp-session-id"] = self.session_id
-        try:
-            from . import auth as _auth
-            tok = _auth.access_token()
-        except Exception:
-            tok = None
-        if tok:
-            h["Authorization"] = "Bearer " + tok
+        if USE_LOCAL_TOKEN:
+            try:
+                from . import auth as _auth
+                tok = _auth.access_token()
+            except Exception:
+                tok = None
+            if tok:
+                h["Authorization"] = "Bearer " + tok
         return h
 
     def _post(self, payload: dict) -> dict | None:
@@ -248,9 +272,9 @@ class HaolaMCP:
             return False
 
     @staticmethod
-    def _allows_all() -> bool:
-        """当前是否放开白名单：只有「个人版 + 已有凭据」才放开。"""
-        return bool(RELAX_ALLOWLIST_WHEN_LOGGED_IN) and HaolaMCP._logged_in()
+    def _allowed(name: str) -> bool:
+        """这个工具是否在本 skill 的能力范围内。登录与否都受 ALLOWED_TOOLS 约束。"""
+        return name in ALLOWED_TOOLS
 
     def ensure_ready(self) -> None:
         if not self._ready:
@@ -259,24 +283,33 @@ class HaolaMCP:
     def tools_list(self) -> list[dict]:
         """列出工具。
 
-        未放开白名单时只返回 ANONYMOUS_TOOLS 内的工具；个人版登录后返回全部。
-        放不放开只看 _allows_all()，与这段文档说的是同一件事。
+        只返回 ALLOWED_TOOLS 内的 —— 这是本 skill 的能力上限，登录后也不会变宽。
+        未登录时进一步收窄到 ANONYMOUS_TOOLS（需要登录的那些暂时不可调）。
         """
         self.ensure_ready()
         tools = self._rpc("tools/list", {}).get("tools", [])
-        if HaolaMCP._allows_all():
-            return tools
-        return [t for t in tools if t.get("name") in ANONYMOUS_TOOLS]
+        logged = self._logged_in()
+        return [
+            t
+            for t in tools
+            if t.get("name") in ALLOWED_TOOLS and (logged or t.get("name") in ANONYMOUS_TOOLS)
+        ]
 
     def call(self, name: str, arguments: dict | None = None) -> dict:
         """调用工具，返回工具自己输出的 JSON（已解开 MCP 的 content 包装）。
 
-        白名单外的工具只在 _allows_all() 为真时放行：个人版登录后可以，企业版永远不行。
+        两道门：先看是否在本 skill 的能力上限 ALLOWED_TOOLS 内（登录也不会变宽），
+        再看是否需要登录而当前没有凭据。
         """
-        if name not in ANONYMOUS_TOOLS and not HaolaMCP._allows_all():
+        if name not in ALLOWED_TOOLS:
             raise MCPError(
                 f"`{name}` 不在本 skill 允许调用的范围内。",
                 code="not_allowed",
+            )
+        if name not in ANONYMOUS_TOOLS and not HaolaMCP._logged_in():
+            raise LoginRequired(
+                f"`{name}` 需要先登录。在本机跑 `python scripts/haola.py login` 一次即可。",
+                code="login_required",
             )
         self.ensure_ready()
         result = self._rpc("tools/call", {"name": name, "arguments": arguments or {}})

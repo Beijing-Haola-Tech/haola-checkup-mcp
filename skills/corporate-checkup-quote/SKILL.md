@@ -5,6 +5,7 @@ license: MIT
 allowed-tools:
   - Bash
   - Read
+  - WebFetch
 metadata:
   openclaw:
     requires:

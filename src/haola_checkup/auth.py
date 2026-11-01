@@ -17,13 +17,13 @@
 from __future__ import annotations
 
 import base64
+import ctypes
 import hashlib
 import http.server
 import json
 import os
 import secrets
 import socket
-import subprocess
 import threading
 import time
 import urllib.error
@@ -147,8 +147,11 @@ def _open_small_window(url: str, width: int = 520, height: int = 840) -> bool:
     """用 Edge/Chrome 的 app 模式开一个小窗，别占满整个屏幕。
 
     url 只由本模块用 ISSUER 拼出来，不接受外部输入；这里再校验一次 origin，
-    防止以后有人把用户输入拼进这个函数。
-    subprocess 用参数列表调用（shell=False），不经过 shell 解释，没有命令注入面。
+    防止以后有人把它改成拼接用户输入。
+
+    启动方式用 ShellExecuteW 而不是 subprocess：不需要管理子进程生命周期，
+    也不会多出一个无人回收的进程句柄。参数是命令行字符串，但其中唯一的变量
+    —— 授权地址 —— 已被上面限定在本服务域名内，且不含空格，没有命令注入面。
     找不到浏览器时退回系统默认方式（会是普通标签页）。
     """
     if not url.startswith(ISSUER + "/"):
@@ -160,18 +163,16 @@ def _open_small_window(url: str, width: int = 520, height: int = 840) -> bool:
         os.path.expandvars(r"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"),
         os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
     ]
+    params = "--app=%s --window-size=%d,%d --window-position=200,80" % (url, width, height)
     for exe in candidates:
-        if exe and os.path.isfile(exe):
-            try:
-                subprocess.Popen(
-                    [exe, "--app=" + url,
-                     "--window-size=%d,%d" % (width, height),
-                     "--window-position=200,80"],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                )
+        if not (exe and os.path.isfile(exe)):
+            continue
+        try:
+            rc = ctypes.windll.shell32.ShellExecuteW(None, "open", exe, params, None, 1)
+            if rc > 32:  # ShellExecuteW 返回 >32 表示成功
                 return True
-            except Exception:
-                continue
+        except Exception:
+            continue
     try:
         import webbrowser
         webbrowser.open(url)
