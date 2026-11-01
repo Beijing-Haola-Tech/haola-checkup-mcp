@@ -6,8 +6,8 @@
 
 不用克隆仓库，读这两个 Markdown 就够：
 
-- 企业团检方案与报价　https://raw.githubusercontent.com/ryanbihai/haola-checkup-mcp/main/skills/corporate-checkup-quote/SKILL.md
-- 个人体检预约　　　　　https://raw.githubusercontent.com/ryanbihai/haola-checkup-mcp/main/skills/personal-checkup-booking/SKILL.md
+- 企业团检方案与报价　https://raw.githubusercontent.com/Beijing-Haola-Tech/haola-checkup-mcp/main/skills/corporate-checkup-quote/SKILL.md
+- 个人体检预约　　　　　https://raw.githubusercontent.com/Beijing-Haola-Tech/haola-checkup-mcp/main/skills/personal-checkup-booking/SKILL.md
 
 每个 `SKILL.md` 里都写全了：怎么连、有哪些工具、每个工具的参数约束、方案怎么读、
 哪些话不能说。同目录下的 `scripts/haola.py` 与 `src/haola_checkup/` 是零依赖 Python

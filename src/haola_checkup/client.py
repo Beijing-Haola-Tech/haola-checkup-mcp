@@ -103,8 +103,8 @@ class MCPError(RuntimeError):
 class LoginRequired(MCPError):
     """当前没有可用登录态，而该工具需要登录。
 
-    不是「客户端不参与」：本客户端会带凭据调用需要登录的工具，
-    凭据来自本机的 `python scripts/haola.py login`。
+    本客户端会带本机凭据调用需要登录的工具，凭据来自
+    `python scripts/haola.py login`。没有凭据时抛这个异常，提示用户登录一次。
     """
 
 

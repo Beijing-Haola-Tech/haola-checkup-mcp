@@ -21,7 +21,7 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://www.ihaola.com.cn/"
-Repository = "https://github.com/ryanbihai/haola-checkup-mcp"
+Repository = "https://github.com/Beijing-Haola-Tech/haola-checkup-mcp"
 Documentation = "https://www.ihaola.com.cn/llms.txt"
 
 [project.scripts]

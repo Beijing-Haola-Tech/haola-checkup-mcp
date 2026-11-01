@@ -13,11 +13,11 @@
 
 不用克隆仓库，直接读这两个文件：
 
-- 企业团检　`https://raw.githubusercontent.com/ryanbihai/haola-checkup-mcp/main/skills/corporate-checkup-quote/SKILL.md`
-- 个人体检　`https://raw.githubusercontent.com/ryanbihai/haola-checkup-mcp/main/skills/personal-checkup-booking/SKILL.md`
+- 企业团检　`https://raw.githubusercontent.com/Beijing-Haola-Tech/haola-checkup-mcp/main/skills/corporate-checkup-quote/SKILL.md`
+- 个人体检　`https://raw.githubusercontent.com/Beijing-Haola-Tech/haola-checkup-mcp/main/skills/personal-checkup-booking/SKILL.md`
 
 `raw.githubusercontent.com` 取不到时，用 GitHub 页面：
-`https://github.com/ryanbihai/haola-checkup-mcp/blob/main/skills/<slug>/SKILL.md`
+`https://github.com/Beijing-Haola-Tech/haola-checkup-mcp/blob/main/skills/<slug>/SKILL.md`
 
 每个 skill 目录都是**自包含**的——`SKILL.md` 加一份零依赖客户端，单独拷走也能跑。
 更多见 [skills/README.md](skills/README.md)。

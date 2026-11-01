@@ -13,13 +13,13 @@
 
 不需要克隆仓库，读这两个文件即可：
 
-- 企业团检　<https://raw.githubusercontent.com/ryanbihai/haola-checkup-mcp/main/skills/corporate-checkup-quote/SKILL.md>
-- 个人体检　<https://raw.githubusercontent.com/ryanbihai/haola-checkup-mcp/main/skills/personal-checkup-booking/SKILL.md>
+- 企业团检　<https://raw.githubusercontent.com/Beijing-Haola-Tech/haola-checkup-mcp/main/skills/corporate-checkup-quote/SKILL.md>
+- 个人体检　<https://raw.githubusercontent.com/Beijing-Haola-Tech/haola-checkup-mcp/main/skills/personal-checkup-booking/SKILL.md>
 
 `raw.githubusercontent.com` 取不到时，用 GitHub 页面地址：
 
-- <https://github.com/ryanbihai/haola-checkup-mcp/blob/main/skills/corporate-checkup-quote/SKILL.md>
-- <https://github.com/ryanbihai/haola-checkup-mcp/blob/main/skills/personal-checkup-booking/SKILL.md>
+- <https://github.com/Beijing-Haola-Tech/haola-checkup-mcp/blob/main/skills/corporate-checkup-quote/SKILL.md>
+- <https://github.com/Beijing-Haola-Tech/haola-checkup-mcp/blob/main/skills/personal-checkup-booking/SKILL.md>
 
 ## 安装
 

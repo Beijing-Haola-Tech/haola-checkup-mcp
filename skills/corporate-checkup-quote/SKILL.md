@@ -11,7 +11,7 @@ metadata:
     requires:
       bins:
         - python
-    homepage: https://github.com/ryanbihai/haola-checkup-mcp
+    homepage: https://github.com/Beijing-Haola-Tech/haola-checkup-mcp
 ---
 
 # 好啦体检 · 企业团检方案与报价
