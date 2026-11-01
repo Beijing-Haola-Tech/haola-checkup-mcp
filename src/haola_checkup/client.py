@@ -33,6 +33,10 @@ __all__ = [
 DEFAULT_URL = "https://ai.ihaola.com.cn/api/mcp/haola-pe"
 PROTOCOL_VERSION = "2025-06-18"
 
+#: 凭据只发给这个 origin。把客户端指向别的地址时一律不带 Authorization，
+#: 避免本机保存的 token 被送到第三方服务上（审计就这一点提过风险）。
+TOKEN_ORIGIN = "https://ai.ihaola.com.cn"
+
 # ---------------------------------------------------------------------------
 # 本 skill 的能力边界。下面的值由构建脚本按 skill 覆写（见 build.mjs），
 # 运行时不改：它们是本 skill 对外的承诺，安全审计会逐项核对声明与实现是否一致。
@@ -97,13 +101,21 @@ class MCPError(RuntimeError):
 
 
 class LoginRequired(MCPError):
-    """该动作要在网页上登录后完成，客户端不参与。"""
+    """当前没有可用登录态，而该工具需要登录。
+
+    不是「客户端不参与」：本客户端会带凭据调用需要登录的工具，
+    凭据来自本机的 `python scripts/haola.py login`。
+    """
 
 
 class HaolaMCP:
-    """好啦体检 MCP 的最小客户端（仅免登录工具）。
+    """好啦体检 MCP 的最小客户端。
+
+    能调哪些工具由模块级 ALLOWED_TOOLS 决定（构建时按 skill 写入）：
+    个人版包含需要登录的工具，登录后即可调用；企业版只有免登录的 9 个。
 
     :param url:     MCP 端点，默认 https://ai.ihaola.com.cn/api/mcp/haola-pe
+                    **凭据只发给这个官方 origin**，换成别的地址不会附带 token
     :param timeout: 单次请求超时秒数
     """
 
@@ -133,7 +145,7 @@ class HaolaMCP:
         }
         if self.session_id:
             h["mcp-session-id"] = self.session_id
-        if USE_LOCAL_TOKEN:
+        if USE_LOCAL_TOKEN and self.url.startswith(TOKEN_ORIGIN + "/"):
             try:
                 from . import auth as _auth
                 tok = _auth.access_token()

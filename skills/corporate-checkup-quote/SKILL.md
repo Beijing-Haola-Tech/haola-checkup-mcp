@@ -133,6 +133,7 @@ python scripts/haola.py call vendor_brands '{}'
 | 能力 | 用在哪 | 具体行为 |
 |---|---|---|
 | 网络（出站） | 调 `haola-pe` 服务 | 只连 `https://ai.ihaola.com.cn`，不连任何其他域名 |
+| 凭据去向 | 登录后的请求 | **只发给 `https://ai.ihaola.com.cn`**；把 `--url` 指向别的地址时不会附带凭据 |
 | 执行命令（shell） | 跑 `python scripts/haola.py` | 只执行本 skill 自带的脚本；登录时用 `--app` 模式拉起 Edge/Chrome 小窗 |
 | 写本地文件 | 存登录凭据（仅个人版） | 只写 `~/.haola/token.json`，不写别处 |
 | 读本地文件 | 读登录凭据（仅个人版） | 只读上面那个文件 |
