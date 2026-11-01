@@ -2,6 +2,15 @@
 name: corporate-checkup-quote
 description: 好啦体检（haola-pe）企业团检与员工体检报价。HR 安排员工体检、做福利体检、年度体检采购、体检询价时使用，可按人均预算出多档团检套餐，逐档列出每类人群的体检项目与金额，并说明门店覆盖范围；涉及合同与发票转商务对接。后端为好啦体检 MCP 服务。
 license: MIT
+allowed-tools:
+  - Bash
+  - Read
+metadata:
+  openclaw:
+    requires:
+      bins:
+        - python
+    homepage: https://github.com/ryanbihai/haola-checkup-mcp
 ---
 
 # 好啦体检 · 企业团检方案与报价
@@ -25,17 +34,13 @@ license: MIT
 
 ```bash
 python scripts/haola.py ping
+python scripts/haola.py tools
 python scripts/haola.py call vendor_brands '{}'
-python scripts/haola.py quote --budget 800 --concerns "久坐、三高"
 ```
 
-**通道 B 也覆盖登录类工具。** 先登录一次，之后全部 25 个工具都能用：
+**通道 B 只放行企业白名单**（`plan_quotation`、`vendor_brands`、`vendor_list`、`knowledge_get`、`faq`、`corp_inquiry`、`corp_contact`、`help`、`progress_report`），其它工具名会直接被拒 —— 这是硬约束，不是能力缺失。
 
-```bash
-python scripts/haola.py login
-```
-
-未登录时只放行免登录工具（`plan_quotation`、`vendor_brands`、`vendor_list`、`knowledge_get`、`faq`、`corp_inquiry`、`corp_contact`、`help`、`progress_report`），其它工具名会直接被拒——**这是白名单，不是能力缺失**，登录后自动放开，不用改任何配置。
+企业链路全程免登录，既不需要、也不应该运行登录命令。
 
 ### 连不上时：先让用户说一句话，别直接说"不支持"
 
@@ -49,7 +54,7 @@ python scripts/haola.py login
 
 不少客户端（WorkBuddy 等）支持在对话里直接添加 MCP 服务：用户发出这句话，客户端自己就能加好，**不需要用户改任何配置文件，也不需要管理员权限**。
 
-**但要分清两件事：能加上 MCP ≠ 能登录。** 加好之后免登录工具立刻可用；登录类工具需要客户端自己支持 MCP 授权，而不少客户端根本没有这个入口（WorkBuddy 没有）。所以**登录一律走通道 B 的 `login` 命令，不要等客户端弹授权**。
+**但要分清两件事：能加上 MCP ≠ 能调用全部工具。** 加好之后白名单内的工具立刻可用；白名单外的工具要看客户端是否支持对应授权。能不能调、要不要登录，见「登录规则」。
 
 如果用户是第一次用，可以让他把地址和需求写在**同一条消息**里，一次说完：
 
@@ -63,9 +68,9 @@ python scripts/haola.py login
 - 工具会重新出现，**直接接着做原来的需求，不要让用户重说一遍**
 - 客户端仍然没有工具 → 进入第 2 步
 
-**第 2 步｜用通道 B 兜住全部能力**
+**第 2 步｜用通道 B 兜住可用能力**
 
-通道 B 不依赖客户端的 MCP 配置：免登录就能查门店、品牌覆盖、领域知识、FAQ；企业版还能直接出方案报价；个人版登录后还能出方案、预约、查订单。详见「登录规则」。
+通道 B 不依赖客户端的 MCP 配置，白名单内的工具都能直接调。具体有哪些、要不要登录，见「登录规则」。
 
 **第 3 步｜两步都不通，才说明限制**
 
@@ -119,6 +124,25 @@ python scripts/haola.py login
 | 你们覆盖哪些城市 / 有没有深圳的门店 | W2 |
 | 要合同 / 要发票 / 想找人聊 | W3 |
 | 员工个人想体检 | 转 `personal-checkup-booking` |
+
+## 这个 skill 会用到什么权限
+
+把范围写在这里，用户和审计都能直接核对，不用去读代码猜。
+
+| 能力 | 用在哪 | 具体行为 |
+|---|---|---|
+| 网络（出站） | 调 `haola-pe` 服务 | 只连 `https://ai.ihaola.com.cn`，不连任何其他域名 |
+| 执行命令（shell） | 跑 `python scripts/haola.py` | 只执行本 skill 自带的脚本；登录时用 `--app` 模式拉起 Edge/Chrome 小窗 |
+| 写本地文件 | 存登录凭据（仅个人版） | 只写 `~/.haola/token.json`，不写别处 |
+| 读本地文件 | 读登录凭据（仅个人版） | 只读上面那个文件 |
+
+明确不做的：
+
+- 不读环境变量、不读浏览器 cookie、不读其他应用的凭据文件
+- 不装依赖、不改系统设置、不写注册表
+- 不把凭据、对话内容发往 `ai.ihaola.com.cn` 以外的任何地址
+
+企业版（`corporate-checkup-quote`）不读也不写凭据文件，全程免登录。
 
 ## 接入
 
@@ -178,13 +202,15 @@ python scripts/haola.py login
 
 先走「连接：两条通道」里的**连不上时**三步。第 1 步是让用户把「帮我连接 MCP：<地址>」这句话发给客户端——不少客户端在对话里就能添加服务，用户不用改配置、也不需要管理员权限。三步都走完仍不行，才按第 3 步说明限制。
 
-通道 B（内置 `scripts/haola.py`）在环境有 Python 时可用：免登录工具直接调，登录类工具先跑一次 `python scripts/haola.py login`。
+通道 B（内置 `scripts/haola.py`）在环境有 Python 时可用，能调哪些工具见「登录规则」。
 
 **不得声称连接成功，不得凭自身知识编造体检方案、项目或价格。**
 
 ## 工具清单
 
 共 25 个工具。`[免]` = 免登录，`[登]` = 需要登录。
+
+**下表是全服务的契约参考。** 本 skill 只调用企业白名单里的 9 个工具；其余工具（个人方案、联系人、预约、订单、报告）仅用于理解服务边界，**不要调用** —— 员工个人需求让员工自己用 `personal-checkup-booking`。
 
 | 工具 | 用途 | 登录 |
 |---|---|---|
@@ -238,9 +264,9 @@ python scripts/haola.py login
 | | `Budget fill` | **为把预算用掉而额外加的项** |
 | | 具体理由 + 「依据：…」 | 针对用户情况，带文献依据 |
 
-> `Required by contract` 和 `Budget fill` 是**服务端内部标记**，不是给用户看的文案。
-> 这两个英文串不得原样出现在回复里；需要解释时换成中文（「体检件要求必做」「预算内补充项」），
-> 或者干脆不讲理由只讲结论。
+> `Required by contract` 和 `Budget fill` 是**服务端内部标记**，不是给用户看的文案，别原样念出来。
+> 解释时用**用户正在使用的语言**：中文用户说「体检件要求必做」「预算内补充项」，
+> 英文用户说 "required by contract" / "budget filler"；也可以只讲结论不讲理由。
 
 ### 「够用方案」的算法
 
@@ -287,6 +313,7 @@ cost_summary = { totalSpent, remaining, overBudgetExtra }
 
 ## 工具调用要点
 
+**下表是全服务的契约参考。** 本 skill 只调用企业白名单里的 9 个工具；其余工具（个人方案、联系人、预约、订单、报告）仅用于理解服务边界，**不要调用** —— 员工个人需求让员工自己用 `personal-checkup-booking`。
 下列约束来自各自的 `inputSchema`，违反会直接报错。
 
 ### help
@@ -383,113 +410,28 @@ planId, hospitalCode, vendorid, appointmentDate
 
 ## 登录规则
 
-只有三类动作要登录：**出个人方案、登记体检人、预约/改期/取消/查订单/查报告**。
-其余一律免登录。用户没走到这三类动作之前，**不要主动提登录**。
+**本 skill 全程免登录。** 企业团检报价、门店查询、领域知识、FAQ、企业咨询都不需要登录。
 
-### 哪些要登录
+### 不要引导用户登录
 
-| 动作 | 工具 | 要登录 |
-|---|---|---|
-| 讲项目含义 | `knowledge_get`、`faq` | 否 |
-| 查门店 | `vendor_list`、`vendor_brands` | 否 |
-| 企业分档报价 | `plan_quotation` | 否 |
-| 企业咨询 | `corp_inquiry`、`corp_contact` | 否 |
-| 报进度 | `progress_report` | 否 |
-| 出个人方案 | `plan_recommend` | 是 |
-| 建档 / 健康画像 | `contact_*`、`contact_profile_*` | 是 |
-| 预约 / 改期 / 取消 | `reservation_*` | 是 |
-| 订单 / 报告 | `order_*`、`welfare_*` | 是 |
-| 注意事项 | `cautions` | 是 |
-| 卡密 | `card_list` | 是 |
+- 不要运行任何登录命令，也不要让用户打开任何登录页。
+- 不要对用户说 OAuth、授权码、token、401 这类词。企业链路里没有登录这一步。
 
-### 遇到「需要登录」怎么办
+### 能力边界写死在脚本里
 
-**不要对用户说**：OAuth、授权码、PKCE、Bearer、token、401、resource。
+本 skill 的脚本只放行这 9 个工具：`plan_quotation`、`vendor_brands`、`vendor_list`、`knowledge_get`、`faq`、`corp_inquiry`、`corp_contact`、`help`、`progress_report`。其它工具名会直接被拒。
 
-只做一件事：**让用户在本机跑一次登录命令。**
+即使这台机器上装过个人体检 skill、也存着个人凭据（`~/.haola/token.json`），
+**企业版也不会读取它**，不会因为「本机已登录」而多放出任何工具。
 
-```bash
-python scripts/haola.py login
-```
+个人健康类工具（`plan_recommend`、`contact_*`、`reservation_*`、`order_*`、`welfare_*`、`cautions`、`card_list`）
+在本 skill 里一律不可用。员工要看自己的方案、预约或报告时，告知对方使用 `personal-checkup-booking`
+—— **不要替员工操作，也不要用企业链路去查。**
 
-它会弹出一个独立的登录小窗（不是整个浏览器），让用户在里面登录一次（手机号 → 获取验证码 → 图形验证码 → 短信码）。
-登录成功后凭据存在本机（`~/.haola/token.json`），**有效期约 30 天**，
-之后所有需要登录的工具都能直接调，用户不用再登。
+### 用户提供的群体健康信息
 
-用户说"登录好了"之后，**原样重试刚才那个调用**，不要让他重说需求。
-
-### 这个命令必须在 skill 目录里跑
-
-```bash
-cd <skill 所在目录> && python scripts/haola.py login
-```
-
-不知道目录时先 `ls skills/` 或直接问用户 skill 装在哪。跑之前先确认目录，
-否则脚本会找不到 `haola_checkup` 包。
-
-### 已经登录过就不用再登
-
-不确定时先跑：
-
-```bash
-python scripts/haola.py whoami
-```
-
-- 输出「已登录」→ 直接调工具
-- 输出「未登录」→ 再走 login
-
-凭据过期（约 30 天）后重新 login 一次即可，不需要重新理解需求。
-
-### MCP 报 401 ≠ 没登录
-
-本机脚本和 MCP 是两条通道，**登录态只在本机脚本里**。
-
-要调登录类工具时，**先 `whoami`，再决定走哪条**，不要一上来就撞 MCP：
-
-```bash
-cd <skill 目录> && python scripts/haola.py whoami
-```
-
-- 输出「已登录」→ **直接用脚本调，不要走 MCP**（MCP 那条必然 401，白费一步）：
-
-  ```bash
-  cd <skill 目录> && python scripts/haola.py call plan_recommend '{"gender":"male","age":41,"budget":800,"mainComplaint":"头晕"}'
-  ```
-
-- 输出「未登录」→ 先 login，再用 `call`
-
-已经撞到 401 的情况也照这个处理：**不要立刻让用户去登录**，先看本机是不是已经登着了。
-
-这条很重要：有些客户端（如 WorkBuddy）不支持 MCP 授权，但允许跑本地脚本。
-脚本登录后 MCP 依旧 401。**这不是失败，是通道选错了。**
-
-### 绝对不要做的
-
-- **不要给用户任何网页登录地址。** 官方那个网页登录页是授权流程中间的一步，
-  缺参数时必然显示「resource 无效」。让用户自己打开它只会浪费一轮对话。
-- 不要让用户把验证码、密码、手机号发给你——**登录全程在用户自己的浏览器里完成**，
-  你只负责让他跑那条命令。
-- 不要说「这个客户端不支持登录」然后放弃。这条路跟客户端无关，跑脚本就能登。
-
-### 红线
-
-- 不索取短信验证码、图形验证码、密码、身份证号
-- 不代填、不代点、不替用户登录
-- 不声称已登录，除非工具确实返回成功
-- 不编造体检项目、价格、门店
-
-### 通道 B 的登录相关命令
-
-`scripts/haola.py` 一共四个子命令：
-
-| 命令 | 作用 |
-|---|---|
-| `python scripts/haola.py login` | 弹出登录小窗，凭据存本机 30 天 |
-| `python scripts/haola.py whoami` | 看当前是否已登录 |
-| `python scripts/haola.py logout` | 清除本机凭据 |
-| `python scripts/haola.py call <工具> '<json>'` | 调工具；登录后不再受免登录白名单限制 |
-
-登录态只存在于本机文件里，不上传、不经过对话。
+只收群体层面（久坐、夜班、女员工占比、年龄段分布）。**不要索取或转述任何单个员工的
+姓名、工号、诊断、病史。** 提交前把要发出去的字段列出来给用户确认。
 
 ## W1 · 方案与报价
 

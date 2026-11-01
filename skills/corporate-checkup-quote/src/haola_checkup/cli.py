@@ -1,7 +1,8 @@
 """命令行入口：haola-checkup <子命令>
 
-只提供免登录能力：报价、门店、FAQ、领域知识、企业咨询。
-需要登录的动作（个人方案、预约、订单、报告）请在网页上完成。
+能调哪些工具由 client.py 的三个开关决定（USE_LOCAL_TOKEN /
+RELAX_ALLOWLIST_WHEN_LOGGED_IN / ENABLE_CORPORATE_QUOTE）。本文件只按这些开关
+注册子命令，不另行定义能力边界，避免两处声明不一致。
 """
 
 from __future__ import annotations
@@ -10,7 +11,19 @@ import argparse
 import json
 import sys
 
-from .client import ANONYMOUS_TOOLS, DEFAULT_URL, HaolaMCP, LoginRequired, MCPError
+from .client import (
+    ANONYMOUS_TOOLS,
+    DEFAULT_URL,
+    ENABLE_CORPORATE_QUOTE,
+    RELAX_ALLOWLIST_WHEN_LOGGED_IN,
+    USE_LOCAL_TOKEN,
+    HaolaMCP,
+    LoginRequired,
+    MCPError,
+)
+
+#: 本 skill 的一句话能力范围，构建时按 skill 覆写，会出现在 --help 里。
+SCOPE_NOTE = "仅企业团检工具，全程免登录"
 
 
 def _force_utf8() -> None:
@@ -42,21 +55,18 @@ def cmd_ping(args) -> int:
         print(f"  session      {mcp.session_id}")
         print(f"  server       {server.get('name', '?')} {server.get('version', '')}".rstrip())
         print(f"  protocol     {info.get('protocolVersion', '?')}")
-        from . import auth as _auth
-        if _auth.access_token():
+        if HaolaMCP._allows_all():
             print("  模式         已登录（白名单已放开，全部工具可调）")
         else:
-            print(f"  模式         未登录，仅免登录工具（{len(ANONYMOUS_TOOLS)} 个）")
+            print(f"  模式         仅白名单内工具（{len(ANONYMOUS_TOOLS)} 个）")
     return 0
 
 
 def cmd_tools(args) -> int:
-    from . import auth as _auth
-
     with HaolaMCP(url=args.url) as mcp:
         tools = mcp.tools_list()
-    logged = bool(_auth.access_token())
-    print(f"可调用 {len(tools)} 个工具" + ("" if logged else "（未登录，只剩免登录工具）") + "\n")
+    logged = HaolaMCP._allows_all()
+    print(f"可调用 {len(tools)} 个工具" + ("" if logged else "（仅白名单内）") + "\n")
     for t in tools:
         print(f"  {t['name']:<24}{_first_line(t.get('description', ''))}")
     if logged:
@@ -67,13 +77,11 @@ def cmd_tools(args) -> int:
 
 
 def cmd_call(args) -> int:
-    from . import auth as _auth
-
-    logged_in = bool(_auth.access_token())
-    if args.name not in ANONYMOUS_TOOLS and not logged_in:
-        print(f"`{args.name}` 需要先登录。", file=sys.stderr)
-        print("在这个目录下跑一次：python scripts/haola.py login", file=sys.stderr)
-        print("可免登录调用的工具：" + "、".join(sorted(ANONYMOUS_TOOLS)), file=sys.stderr)
+    if args.name not in ANONYMOUS_TOOLS and not HaolaMCP._allows_all():
+        print(f"`{args.name}` 不在本 skill 的调用范围内。", file=sys.stderr)
+        print("可调用的工具：" + "、".join(sorted(ANONYMOUS_TOOLS)), file=sys.stderr)
+        if USE_LOCAL_TOKEN:
+            print("个人体检类工具需先登录：在这个目录下跑 python scripts/haola.py login", file=sys.stderr)
         return 5
 
     try:
@@ -144,7 +152,7 @@ def cmd_whoami(args) -> int:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="haola-checkup",
-        description="好啦体检 MCP 命令行（仅免登录工具：报价、门店、FAQ、知识、企业咨询）",
+        description="好啦体检 MCP 命令行（" + SCOPE_NOTE + "）",
     )
     p.add_argument("--url", default=DEFAULT_URL, help=f"MCP 端点，默认 {DEFAULT_URL}")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -152,27 +160,28 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("ping", help="测试连通性")
     sp.set_defaults(func=cmd_ping)
 
-    sp = sub.add_parser("tools", help="列出可调用的免登录工具")
+    sp = sub.add_parser("tools", help="列出可调用的工具")
     sp.set_defaults(func=cmd_tools)
 
-    sp = sub.add_parser("call", help="调用一个免登录工具")
+    sp = sub.add_parser("call", help="调用工具")
     sp.add_argument("name", help="工具名，须在白名单内")
     sp.add_argument("json", nargs="?", default="", help='参数 JSON，如 \'{"city":"北京"}\'')
     sp.set_defaults(func=cmd_call)
 
-    sp = sub.add_parser("login", help="打开浏览器登录一次，之后自动带凭据")
-    sp.add_argument("--timeout", type=int, default=300)
-    sp.add_argument("--no-browser", action="store_true", help="只打印链接，不自动打开")
-    sp.set_defaults(func=cmd_login)
+    # 登录相关子命令只在会读凭据的 skill（个人版）里注册；企业版全程免登录，不注册
+    if USE_LOCAL_TOKEN:
+        sp = sub.add_parser("login", help="弹出登录小窗登录一次，之后自动带凭据")
+        sp.add_argument("--timeout", type=int, default=300)
+        sp.add_argument("--no-browser", action="store_true", help="只打印链接，不自动打开")
+        sp.set_defaults(func=cmd_login)
 
-    sp = sub.add_parser("logout", help="清除本地凭据")
-    sp.set_defaults(func=cmd_logout)
+        sp = sub.add_parser("logout", help="清除本地凭据")
+        sp.set_defaults(func=cmd_logout)
 
-    sp = sub.add_parser("whoami", help="查看是否已登录")
-    sp.set_defaults(func=cmd_whoami)
+        sp = sub.add_parser("whoami", help="查看是否已登录")
+        sp.set_defaults(func=cmd_whoami)
 
-    # 只有白名单里包含 plan_quotation 的场景（企业版）才注册这个子命令
-    if "plan_quotation" in ANONYMOUS_TOOLS:
+    if ENABLE_CORPORATE_QUOTE:
         sp = sub.add_parser("quote", help="企业团检报价")
         sp.add_argument("--budget", type=int, required=True, help="人均预算，元")
         sp.add_argument("--concerns", required=True, help="健康关注，如 久坐、三高")

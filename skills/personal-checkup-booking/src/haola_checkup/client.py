@@ -3,12 +3,17 @@
 只做一件事：把 MCP Streamable HTTP 的握手、会话、SSE 解析包起来，
 让 Skill 的脚本可以直接调用远端工具，不需要客户预先配置 MCP。
 
-设计约束（重要）：
-    - 默认只走免登录；用户在本机跑过 `login` 之后，请求会自动带上 Bearer。
-    - 未登录时只允许调用一组固定的免登录工具，名单见 ANONYMOUS_TOOLS。
-    - 登录后白名单自动放开，全部工具都能调，不需要改任何配置。
+能力边界由下面三个模块级开关决定，构建时按 skill 覆写：
 
-登录态只存在本机 `~/.haola/token.json`，和 MCP 客户端那条通道互不影响。
+    USE_LOCAL_TOKEN                 是否读取本机凭据（~/.haola/token.json）
+    RELAX_ALLOWLIST_WHEN_LOGGED_IN  有凭据时是否放开白名单
+    ENABLE_CORPORATE_QUOTE          是否提供企业团检报价
+
+个人版：三个都 True，登录后可用全部工具。
+企业版：后两个为 False，且不读凭据 —— 本机存着个人 token 也不会扩大企业链路的能力，
+        它永远只能调用企业白名单里的工具。
+
+白名单本身见 ANONYMOUS_TOOLS，也是构建时写入的。
 """
 
 from __future__ import annotations
@@ -29,7 +34,26 @@ __all__ = [
 DEFAULT_URL = "https://ai.ihaola.com.cn/api/mcp/haola-pe"
 PROTOCOL_VERSION = "2025-06-18"
 
-#: 客户端被允许调用的工具白名单。只有这些，多一个都不行。
+# ---------------------------------------------------------------------------
+# 本 skill 的能力边界。三个开关由构建脚本按 skill 覆写（见 build.mjs），
+# 运行时不改：它们是本 skill 对外的承诺，安全审计会逐项核对实现与声明是否一致。
+# ---------------------------------------------------------------------------
+
+#: 是否读取本机凭据（~/.haola/token.json）。
+#: 个人版 True —— 登录一次，之后可用需要登录的工具。
+#: 企业版 False —— 企业链路全程免登录，既不读取也不使用个人凭据。
+USE_LOCAL_TOKEN = True
+
+#: 已有凭据时是否放开 ANONYMOUS_TOOLS 白名单。
+#: 个人版 True —— 登录后全部工具可用。
+#: 企业版 False —— 即使本机存着个人凭据，也仍只放行企业白名单内的工具。
+RELAX_ALLOWLIST_WHEN_LOGGED_IN = True
+
+#: 是否提供企业团检报价（plan_quotation）。
+#: 企业版 True；个人版 False —— 个人场景不做团检报价。
+ENABLE_CORPORATE_QUOTE = False
+
+#: 客户端被允许调用的工具白名单，构建时按 skill 覆写。
 ANONYMOUS_TOOLS = frozenset(
     {
         "vendor_list",
@@ -214,29 +238,44 @@ class HaolaMCP:
 
     @staticmethod
     def _logged_in() -> bool:
+        """本机是否有可用凭据。企业版不读凭据，恒为 False。"""
+        if not USE_LOCAL_TOKEN:
+            return False
         try:
             from . import auth as _auth
             return bool(_auth.access_token())
         except Exception:
             return False
 
+    @staticmethod
+    def _allows_all() -> bool:
+        """当前是否放开白名单：只有「个人版 + 已有凭据」才放开。"""
+        return bool(RELAX_ALLOWLIST_WHEN_LOGGED_IN) and HaolaMCP._logged_in()
+
     def ensure_ready(self) -> None:
         if not self._ready:
             self.initialize()
 
     def tools_list(self) -> list[dict]:
-        """列出工具。只保留白名单内的，白名单外的一律不呈现。"""
+        """列出工具。
+
+        未放开白名单时只返回 ANONYMOUS_TOOLS 内的工具；个人版登录后返回全部。
+        放不放开只看 _allows_all()，与这段文档说的是同一件事。
+        """
         self.ensure_ready()
         tools = self._rpc("tools/list", {}).get("tools", [])
-        if self._logged_in():
+        if HaolaMCP._allows_all():
             return tools
         return [t for t in tools if t.get("name") in ANONYMOUS_TOOLS]
 
     def call(self, name: str, arguments: dict | None = None) -> dict:
-        """调用一个免登录工具，返回工具自己输出的 JSON（已解开 MCP 的 content 包装）。"""
-        if name not in ANONYMOUS_TOOLS and not self._logged_in():
+        """调用工具，返回工具自己输出的 JSON（已解开 MCP 的 content 包装）。
+
+        白名单外的工具只在 _allows_all() 为真时放行：个人版登录后可以，企业版永远不行。
+        """
+        if name not in ANONYMOUS_TOOLS and not HaolaMCP._allows_all():
             raise MCPError(
-                f"`{name}` 不在本客户端允许调用的范围内。这个动作需要在网页上登录后完成。",
+                f"`{name}` 不在本 skill 允许调用的范围内。",
                 code="not_allowed",
             )
         self.ensure_ready()
@@ -269,7 +308,16 @@ class HaolaMCP:
         return payload if payload is not None else {"raw": text}
 
     def quote(self, budget: int, concerns: str, populations=("man", "lady", "girl"), tier: str = "员工档") -> dict:
-        """企业团检报价（免登录）。"""
+        """企业团检报价（免登录）。
+
+        只有 ENABLE_CORPORATE_QUOTE 为真的 skill（企业版）才提供这个方法；
+        个人版调用会直接拒绝，避免把团检报价能力带进个人场景。
+        """
+        if not ENABLE_CORPORATE_QUOTE:
+            raise MCPError(
+                "个人版不做企业团检报价，请使用 corporate-checkup-quote 技能。",
+                code="not_allowed",
+            )
         return self.call(
             "plan_quotation",
             {"quotes": [{"tier": tier, "budget": budget,
