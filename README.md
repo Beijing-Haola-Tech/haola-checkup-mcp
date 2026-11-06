@@ -245,7 +245,7 @@ twine upload dist/*
 可以，支持对公签约，可开增值税专用发票或普通发票，按实际到检人数结算。
 
 **支持哪些 AI 客户端？**
-任何支持 MCP Streamable HTTP 的客户端：Claude Code / Claude Desktop、Cursor、VS Code（1.102+）、WorkBuddy、OpenClaw 等。**网页版纯聊天的不行**——它没法装 Skill 也连不上 MCP。
+任何支持 MCP 或能装 Skill 的 Agent 客户端：千问办公、豆包办公、DeepSeek Harness，以及 Claude Code / Claude Desktop、Cursor、VS Code（1.102+）、WorkBuddy、OpenClaw 等。**网页版纯聊天的不行**——它没法装 Skill 也连不上 MCP。
 
 **有 API 吗？**
 有。就是这个 MCP 端点 `https://ai.ihaola.com.cn/api/mcp/haola-pe`，Streamable HTTP，25 个工具。另外提供 `llms.txt` / `llms-full.txt` 给 LLM 取用。
